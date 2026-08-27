@@ -24,7 +24,7 @@ export default function Documents() {
   const fileFor = useRef<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const driveToken = useRef<string | null>(null);
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+  const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
 
   function getGoogle() {
     return (window as unknown as { google?: any }).google;

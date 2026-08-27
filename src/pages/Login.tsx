@@ -20,7 +20,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const googleRef = useRef<HTMLDivElement>(null);
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+  const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
 
   useEffect(() => {
     if (!googleClientId || !window.google || !googleRef.current) return;
