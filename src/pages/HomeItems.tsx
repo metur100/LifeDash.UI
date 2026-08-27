@@ -150,14 +150,15 @@ export default function HomeItems() {
           {repairs.length === 0
             ? <Empty title="Nichts kaputt." hint="Trage eine Reparatur ein, damit sie nicht vergessen wird." />
             : <table>
-                <thead><tr><th>Aufgabe</th><th>Raum</th><th>Termin</th><th className="num">Aktion</th></tr></thead>
+                <thead><tr><th>Aufgabe</th><th>Raum</th><th>Termin</th><th className="num action-col">Aktion</th></tr></thead>
                 <tbody>
                   {repairs.map((r) => (
                     <tr key={r.id}>
                       <td><strong>{r.title}</strong>{r.vendor && <div className="alert-msg">{r.vendor}</div>}</td>
                       <td>{r.room ?? "—"}</td>
                       <td>{r.scheduledOn ? `${shortDate(r.scheduledOn)} · ${countdown(daysUntil(r.scheduledOn))}` : "offen"}</td>
-                      <td className="num">
+                      <td className="num action-cell">
+                        <div className="action-stack">
                         <button className="btn ghost small icon-only" aria-label="Als erledigt markieren" title="Als erledigt markieren" onClick={() => complete(r)}>
                           <i className="fa-solid fa-check" aria-hidden />
                           <span className="sr-only">Erledigt</span>
@@ -170,6 +171,7 @@ export default function HomeItems() {
                           <i className="fa-solid fa-trash" aria-hidden />
                           <span className="sr-only">Löschen</span>
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -185,7 +187,7 @@ export default function HomeItems() {
             {warranties.length === 0
               ? <Empty title="Keine Garantien erfasst." hint="Kaufdatum und Garantieende eintragen lohnt sich." />
               : <table>
-                  <thead><tr><th>Garantie</th><th className="num">Status</th><th className="num">Aktion</th></tr></thead>
+                  <thead><tr><th>Garantie</th><th className="num">Status</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
                     {warranties.map((w) => {
                       const d = daysUntil(w.warrantyUntil);
@@ -199,7 +201,8 @@ export default function HomeItems() {
                                 </span>
                               : <span className="badge">ohne Datum</span>}
                           </td>
-                          <td className="num">
+                          <td className="num action-cell">
+                            <div className="action-stack">
                             <button className="btn ghost small icon-only" aria-label="Garantie bearbeiten" title="Garantie bearbeiten" onClick={() => editItem(w)}>
                               <i className="fa-solid fa-pen-to-square" aria-hidden />
                               <span className="sr-only">Bearbeiten</span>
@@ -208,6 +211,7 @@ export default function HomeItems() {
                               <i className="fa-solid fa-trash" aria-hidden />
                               <span className="sr-only">Löschen</span>
                             </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -220,13 +224,14 @@ export default function HomeItems() {
         <Section title="Anschaffungen">
           <div className="card">
             <table>
-              <thead><tr><th>Anschaffung</th><th className="num">Betrag</th><th className="num">Aktion</th></tr></thead>
+              <thead><tr><th>Anschaffung</th><th className="num">Betrag</th><th className="num action-col">Aktion</th></tr></thead>
               <tbody>
                 {purchases.map((p) => (
                   <tr key={p.id}>
                     <td><strong>{p.title}</strong><div className="alert-msg">{shortDate(p.purchasedOn)}</div></td>
                     <td className="num">{p.cost ? euro(p.cost, p.currency) : "—"}</td>
-                    <td className="num">
+                    <td className="num action-cell">
+                      <div className="action-stack">
                       <button className="btn ghost small icon-only" aria-label="Anschaffung bearbeiten" title="Anschaffung bearbeiten" onClick={() => editItem(p)}>
                         <i className="fa-solid fa-pen-to-square" aria-hidden />
                         <span className="sr-only">Bearbeiten</span>
@@ -235,6 +240,7 @@ export default function HomeItems() {
                         <i className="fa-solid fa-trash" aria-hidden />
                         <span className="sr-only">Löschen</span>
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -249,14 +255,15 @@ export default function HomeItems() {
           {doneItems.length === 0
             ? <Empty title="Noch nichts abgeschlossen." hint="Als erledigt markierte Einträge erscheinen hier." />
             : <table>
-                <thead><tr><th>Eintrag</th><th>Art</th><th>Status</th><th className="num">Aktion</th></tr></thead>
+                <thead><tr><th>Eintrag</th><th>Art</th><th>Status</th><th className="num action-col">Aktion</th></tr></thead>
                 <tbody>
                   {doneItems.map((d) => (
                     <tr key={d.id}>
                       <td><strong>{d.title}</strong><div className="alert-msg">{d.room ?? d.vendor ?? ""}</div></td>
                       <td>{d.kind}</td>
                       <td><span className="badge green">done</span></td>
-                      <td className="num">
+                      <td className="num action-cell">
+                        <div className="action-stack">
                         <button className="btn ghost small icon-only" aria-label="Wieder öffnen" title="Wieder öffnen" onClick={() => reopen(d)}>
                           <i className="fa-solid fa-rotate-left" aria-hidden />
                           <span className="sr-only">Wieder öffnen</span>
@@ -265,6 +272,7 @@ export default function HomeItems() {
                           <i className="fa-solid fa-trash" aria-hidden />
                           <span className="sr-only">Löschen</span>
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

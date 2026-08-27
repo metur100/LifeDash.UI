@@ -4,7 +4,7 @@ import { countdown } from "../lib/format";
 
 const moduleLabel: Record<string, string> = {
   family: "Familie", authority: "Behörden", finance: "Finanzen",
-  home: "Zuhause", travel: "Reisen", general: "Allgemein",
+  home: "Allgemein", travel: "Reisen", general: "Allgemein",
 };
 
 export default function AlertRow({ alert }: { alert: Alert }) {

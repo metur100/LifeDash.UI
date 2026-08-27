@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { useTheme } from "./ThemeContext";
 
 const links = [
   { to: "/", label: "Übersicht", icon: "fa-solid fa-table-columns", end: true },
   { to: "/family", label: "Familie", icon: "fa-solid fa-people-group" },
   { to: "/authorities", label: "Behörden", icon: "fa-solid fa-building-shield" },
   { to: "/finance", label: "Finanzen", icon: "fa-solid fa-wallet" },
-  { to: "/home-items", label: "Zuhause", icon: "fa-solid fa-house" },
   { to: "/travel", label: "Reisen", icon: "fa-solid fa-plane-departure" },
   { to: "/documents", label: "Dokumente", icon: "fa-solid fa-folder-open" },
   { to: "/tasks", label: "Aufgaben", icon: "fa-solid fa-list-check" },
@@ -15,6 +15,7 @@ const links = [
 
 export default function Layout({ alertCount }: { alertCount: number }) {
   const { session, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
@@ -82,6 +83,15 @@ export default function Layout({ alertCount }: { alertCount: number }) {
           <div className="rail-foot">
             <span>{session?.displayName}</span>
             <div style={{ marginTop: 8 }}>
+              <button
+                className="btn ghost icon-only"
+                aria-label={theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"}
+                title={theme === "dark" ? "Helles Design" : "Dunkles Design"}
+                onClick={toggleTheme}
+              >
+                <i className={`fa-solid ${theme === "dark" ? "fa-sun" : "fa-moon"}`} aria-hidden />
+                <span className="sr-only">Theme wechseln</span>
+              </button>{" "}
               <button className="btn ghost icon-only" aria-label="Abmelden" title="Abmelden" onClick={signOut}>
                 <i className="fa-solid fa-right-from-bracket" aria-hidden />
                 <span className="sr-only">Abmelden</span>

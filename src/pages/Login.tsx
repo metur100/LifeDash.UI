@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
+import { useTheme } from "../components/ThemeContext";
 import { ErrorBar } from "../components/Ui";
 
 declare global {
@@ -18,6 +19,7 @@ declare global {
 
 export default function Login() {
   const { signInGoogle } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const googleRef = useRef<HTMLDivElement>(null);
@@ -57,6 +59,18 @@ export default function Login() {
         <h1 style={{ marginBottom: 18 }}>Life Dashboard</h1>
 
         <div className="card">
+          <div className="row" style={{ justifyContent: "flex-end" }}>
+            <button
+              className="btn ghost icon-only"
+              aria-label={theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"}
+              title={theme === "dark" ? "Helles Design" : "Dunkles Design"}
+              onClick={toggleTheme}
+            >
+              <i className={`fa-solid ${theme === "dark" ? "fa-sun" : "fa-moon"}`} aria-hidden />
+              <span className="sr-only">Theme wechseln</span>
+            </button>
+          </div>
+
           <ErrorBar message={error} />
 
           <p className="auth-hint">Google-Konto verbinden, um Life Dashboard zu nutzen.</p>

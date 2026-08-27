@@ -23,7 +23,7 @@ const yearly = (amount: number, cadence: string) => {
 const cadenceLabel: Record<string, string> = {
   monthly: "monatlich",
   quarterly: "quartalsweise",
-  yearly: "j\u00E4hrlich",
+  yearly: "jährlich",
   onetime: "einmalig",
 };
 
@@ -312,7 +312,7 @@ export default function Finance() {
       fields: [
         { key: "title", label: "Titel" },
         { key: "amount", label: "Betrag", type: "number" },
-        { key: "dueOn", label: "F\u00E4llig am", type: "date" },
+        { key: "dueOn", label: "Fällig am", type: "date" },
         { key: "category", label: "Kategorie" },
       ],
       initial: {
@@ -340,9 +340,9 @@ export default function Finance() {
 
   async function removePayment(id: number) {
     const ok = await dialog.confirm({
-      title: "Zahlung l\u00F6schen",
-      message: "Zahlung wirklich l\u00F6schen?",
-      confirmText: "L\u00F6schen",
+      title: "Zahlung löschen",
+      message: "Zahlung wirklich löschen?",
+      confirmText: "Löschen",
       danger: true,
     });
     if (!ok) return;
@@ -361,7 +361,7 @@ export default function Finance() {
       fields: [
         { key: "title", label: "Titel" },
         { key: "amount", label: "Betrag", type: "number" },
-        { key: "dueOn", label: "F\u00E4llig am", type: "date" },
+        { key: "dueOn", label: "Fällig am", type: "date" },
         { key: "category", label: "Kategorie" },
       ],
       initial: {
@@ -481,9 +481,9 @@ export default function Finance() {
 
   async function removeIncome(id: number) {
     const ok = await dialog.confirm({
-      title: "Einnahme l\u00F6schen",
-      message: "Einnahme wirklich l\u00F6schen?",
-      confirmText: "L\u00F6schen",
+      title: "Einnahme löschen",
+      message: "Einnahme wirklich löschen?",
+      confirmText: "Löschen",
       danger: true,
     });
     if (!ok) return;
@@ -591,9 +591,9 @@ export default function Finance() {
 
   async function removeCost(id: number) {
     const ok = await dialog.confirm({
-      title: "Fixkosten l\u00F6schen",
-      message: "Fixkosten-Eintrag wirklich l\u00F6schen?",
-      confirmText: "L\u00F6schen",
+      title: "Fixkosten löschen",
+      message: "Fixkosten-Eintrag wirklich löschen?",
+      confirmText: "Löschen",
       danger: true,
     });
     if (!ok) return;
@@ -622,8 +622,8 @@ export default function Finance() {
             { value: "yearly", label: "yearly" },
           ],
         },
-        { key: "renewsOn", label: "F\u00E4llig/Verl\u00E4ngerung", type: "date" },
-        { key: "cancelByOn", label: "K\u00FCndigen bis", type: "date" },
+        { key: "renewsOn", label: "Fällig/Verlängerung", type: "date" },
+        { key: "cancelByOn", label: "Kündigen bis", type: "date" },
         { key: "provider", label: "Kategorie", type: "select", options: categoryOptions(s.provider) },
       ],
       initial: {
@@ -655,9 +655,9 @@ export default function Finance() {
 
   async function removeSubscription(id: number) {
     const ok = await dialog.confirm({
-      title: "Vertrag l\u00F6schen",
-      message: "Vertrag wirklich l\u00F6schen?",
-      confirmText: "L\u00F6schen",
+      title: "Vertrag löschen",
+      message: "Vertrag wirklich löschen?",
+      confirmText: "Löschen",
       danger: true,
     });
     if (!ok) return;
@@ -697,8 +697,8 @@ export default function Finance() {
           ],
         },
         { key: "dayOfMonth", label: "Zahltag (1-31, nur Fixkosten)", type: "number" },
-        { key: "renewsOn", label: "F\u00E4lligkeitsdatum (Abo/Vertrag)", type: "date" },
-        { key: "cancelByOn", label: "K\u00FCndigen bis (Abo/Vertrag)", type: "date" },
+        { key: "renewsOn", label: "Fälligkeitsdatum (Abo/Vertrag)", type: "date" },
+        { key: "cancelByOn", label: "Kündigen bis (Abo/Vertrag)", type: "date" },
         { key: "category", label: "Kategorie", type: "select", options: categoryOptions("sonstiges") },
       ],
       initial: {
@@ -766,10 +766,10 @@ export default function Finance() {
         <Stat label="Einnahmen / Jahr" value={euro(overview.yearIncome)} />
         <Stat label="Laufende Kosten / Monat" value={euro(overview.monthCosts)} />
         <Stat label="Laufende Kosten / Jahr" value={euro(overview.yearCosts)} />
-        <Stat label="Bleibt \u00FCbrig / Monat" value={euro(overview.leftMonth)} tone={overview.leftMonth < 0 ? "neg" : "pos"} />
-        <Stat label="Bleibt \u00FCbrig / Jahr" value={euro(overview.leftYear)} tone={overview.leftYear < 0 ? "neg" : "pos"} />
-        <Stat label="Sparen m\u00F6glich / Monat" value={euro(overview.saveMonth)} tone="pos" />
-        <Stat label="Sparen m\u00F6glich / Jahr" value={euro(overview.saveYear)} tone="pos" />
+        <Stat label="Bleibt übrig / Monat" value={euro(overview.leftMonth)} tone={overview.leftMonth < 0 ? "neg" : "pos"} />
+        <Stat label="Bleibt übrig / Jahr" value={euro(overview.leftYear)} tone={overview.leftYear < 0 ? "neg" : "pos"} />
+        <Stat label="Sparen möglich / Monat" value={euro(overview.saveMonth)} tone="pos" />
+        <Stat label="Sparen möglich / Jahr" value={euro(overview.saveYear)} tone="pos" />
       </div>
 
       <Section
@@ -785,15 +785,15 @@ export default function Finance() {
           {upcoming.length === 0 ? (
             <Empty title="Nichts offen." hint="Es gibt aktuell keine anstehenden Zahlungen." />
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table>
+            <div className="table-scroll finance-table-wrap">
+              <table className="finance-table">
                 <thead>
                   <tr>
                     <th>Posten</th>
-                    <th>Herkunft</th>
-                    <th>F\u00E4llig</th>
+                    <th className="hide-phone">Herkunft</th>
+                    <th>Fällig</th>
                     <th className="num">Betrag</th>
-                    <th className="num">Aktion</th>
+                    <th className="num action-col">Aktion</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -803,9 +803,9 @@ export default function Finance() {
                       <tr key={item.key}>
                         <td>
                           <strong>{item.title}</strong>
-                          <div className="alert-msg">{item.category}</div>
+                          <div className="alert-msg compact-mobile">{item.category}</div>
                         </td>
-                        <td>
+                        <td className="hide-phone">
                           <span className="badge">
                             {item.source === "payment" ? "einmalig" : item.source === "fixed" ? "Fixkosten" : "Abo/Vertrag"}
                           </span>
@@ -817,7 +817,8 @@ export default function Finance() {
                           </span>
                         </td>
                         <td className="num">{euro(item.amount, item.currency)}</td>
-                        <td className="num">
+                        <td className="num action-cell">
+                          <div className="action-stack">
                           {item.source === "payment" ? (
                             <>
                               <button className="btn ghost small icon-only" aria-label="Als bezahlt markieren" title="Als bezahlt markieren" onClick={() => markPaid(item.payment as Payment)}>
@@ -828,9 +829,9 @@ export default function Finance() {
                                 <i className="fa-solid fa-pen-to-square" aria-hidden />
                                 <span className="sr-only">Bearbeiten</span>
                               </button>{" "}
-                              <button className="btn danger small icon-only" aria-label="Zahlung l\u00F6schen" title="Zahlung l\u00F6schen" onClick={() => removePayment(item.id)}>
+                              <button className="btn danger small icon-only" aria-label="Zahlung löschen" title="Zahlung löschen" onClick={() => removePayment(item.id)}>
                                 <i className="fa-solid fa-trash" aria-hidden />
-                                <span className="sr-only">L\u00F6schen</span>
+                                <span className="sr-only">Löschen</span>
                               </button>
                             </>
                           ) : item.source === "fixed" ? (
@@ -870,6 +871,7 @@ export default function Finance() {
                               </button>
                             </>
                           )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -891,16 +893,16 @@ export default function Finance() {
         }
       >
         <div className="card">
-          <div style={{ overflowX: "auto" }}>
-            <table>
+          <div className="table-scroll finance-table-wrap">
+            <table className="finance-table">
               <thead>
                 <tr>
                   <th>Posten</th>
                   <th>Turnus</th>
-                  <th>Zahlungsinfo</th>
+                  <th className="hide-phone">Zahlungsinfo</th>
                   <th className="num">Monat</th>
-                  <th className="num">Jahr</th>
-                  <th className="num">Aktion</th>
+                  <th className="num hide-phone">Jahr</th>
+                  <th className="num action-col">Aktion</th>
                 </tr>
               </thead>
               <tbody>
@@ -910,17 +912,18 @@ export default function Finance() {
                     <tr key={line.key}>
                       <td>
                         <strong>{line.name}</strong>
-                        <div className="alert-msg">{line.category} | {line.isActive ? "aktiv" : "pausiert"}</div>
+                        <div className="alert-msg compact-mobile">{line.category} | {line.isActive ? "aktiv" : "pausiert"}</div>
                       </td>
                       <td>{cadenceLabel[line.cadence] ?? line.cadence}</td>
-                      <td>
+                      <td className="hide-phone">
                         {line.source === "fixed"
                           ? (line.dayOfMonth ? `jeden ${line.dayOfMonth}.` : "kein Zahltag")
-                          : (line.cancelByOn ? `kündigen bis ${shortDate(line.cancelByOn)} (${countdown(cancel)})` : `f\u00E4llig am ${shortDate(line.renewsOn)}`)}
+                          : (line.cancelByOn ? `kündigen bis ${shortDate(line.cancelByOn)} (${countdown(cancel)})` : `fällig am ${shortDate(line.renewsOn)}`)}
                       </td>
                       <td className="num">{euro(monthly(line.amount, line.cadence), line.currency)}</td>
-                      <td className="num">{euro(yearly(line.amount, line.cadence), line.currency)}</td>
-                      <td className="num">
+                      <td className="num hide-phone">{euro(yearly(line.amount, line.cadence), line.currency)}</td>
+                      <td className="num action-cell">
+                        <div className="action-stack">
                         {line.source === "fixed" ? (
                           <>
                             <button className="btn ghost small icon-only" aria-label={line.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} title={line.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} onClick={() => {
@@ -937,9 +940,9 @@ export default function Finance() {
                               <i className="fa-solid fa-pen-to-square" aria-hidden />
                               <span className="sr-only">Bearbeiten</span>
                             </button>{" "}
-                            <button className="btn danger small icon-only" aria-label="Fixkosten l\u00F6schen" title="Fixkosten l\u00F6schen" onClick={() => removeCost(line.id)}>
+                            <button className="btn danger small icon-only" aria-label="Fixkosten löschen" title="Fixkosten löschen" onClick={() => removeCost(line.id)}>
                               <i className="fa-solid fa-trash" aria-hidden />
-                              <span className="sr-only">L\u00F6schen</span>
+                              <span className="sr-only">Löschen</span>
                             </button>
                           </>
                         ) : (
@@ -958,12 +961,13 @@ export default function Finance() {
                               <i className="fa-solid fa-pen-to-square" aria-hidden />
                               <span className="sr-only">Bearbeiten</span>
                             </button>{" "}
-                            <button className="btn danger small icon-only" aria-label="Vertrag l\u00F6schen" title="Vertrag l\u00F6schen" onClick={() => removeSubscription(line.id)}>
+                            <button className="btn danger small icon-only" aria-label="Vertrag löschen" title="Vertrag löschen" onClick={() => removeSubscription(line.id)}>
                               <i className="fa-solid fa-trash" aria-hidden />
-                              <span className="sr-only">L\u00F6schen</span>
+                              <span className="sr-only">Löschen</span>
                             </button>
                           </>
                         )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -987,15 +991,15 @@ export default function Finance() {
           {paid.length === 0 ? (
             <Empty title="Noch keine bezahlten Zahlungen." hint="Sobald du eine Zahlung als bezahlt markierst, erscheint sie hier." />
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table>
+            <div className="table-scroll finance-table-wrap">
+              <table className="finance-table">
                 <thead>
                   <tr>
                     <th>Zahlung</th>
-                    <th>F\u00E4llig</th>
-                    <th>Bezahlt am</th>
+                    <th>Fällig</th>
+                    <th className="hide-phone">Bezahlt am</th>
                     <th className="num">Betrag</th>
-                    <th className="num">Aktion</th>
+                    <th className="num action-col">Aktion</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1003,9 +1007,10 @@ export default function Finance() {
                     <tr key={p.id}>
                       <td><strong>{p.title}</strong></td>
                       <td>{shortDate(p.dueOn)}</td>
-                      <td>{shortDate(p.paidOn)}</td>
+                      <td className="hide-phone">{shortDate(p.paidOn)}</td>
                       <td className="num">{euro(p.amount, p.currency)}</td>
-                      <td className="num">
+                      <td className="num action-cell">
+                        <div className="action-stack">
                         <button className="btn ghost small icon-only" aria-label="Als offen markieren" title="Als offen markieren" onClick={() => markUnpaid(p)}>
                           <i className="fa-solid fa-rotate-left" aria-hidden />
                           <span className="sr-only">Offen</span>
@@ -1014,10 +1019,11 @@ export default function Finance() {
                           <i className="fa-solid fa-pen-to-square" aria-hidden />
                           <span className="sr-only">Bearbeiten</span>
                         </button>{" "}
-                        <button className="btn danger small icon-only" aria-label="Zahlung l\u00F6schen" title="Zahlung l\u00F6schen" onClick={() => removePayment(p.id)}>
+                        <button className="btn danger small icon-only" aria-label="Zahlung löschen" title="Zahlung löschen" onClick={() => removePayment(p.id)}>
                           <i className="fa-solid fa-trash" aria-hidden />
-                          <span className="sr-only">L\u00F6schen</span>
+                          <span className="sr-only">Löschen</span>
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1038,16 +1044,16 @@ export default function Finance() {
         }
       >
         <div className="card">
-          <div style={{ overflowX: "auto" }}>
-            <table>
+          <div className="table-scroll finance-table-wrap">
+            <table className="finance-table">
               <thead>
                 <tr>
                   <th>Quelle</th>
                   <th>Turnus</th>
-                  <th>Eingangstag</th>
+                  <th className="hide-phone">Eingangstag</th>
                   <th className="num">Monat</th>
-                  <th className="num">Jahr</th>
-                  <th className="num">Aktion</th>
+                  <th className="num hide-phone">Jahr</th>
+                  <th className="num action-col">Aktion</th>
                 </tr>
               </thead>
               <tbody>
@@ -1055,13 +1061,14 @@ export default function Finance() {
                   <tr key={i.id}>
                     <td>
                       <strong>{i.source}</strong>
-                      <div className="alert-msg">{i.isActive ? "aktiv" : "pausiert"}</div>
+                      <div className="alert-msg compact-mobile">{i.isActive ? "aktiv" : "pausiert"}</div>
                     </td>
                     <td>{cadenceLabel[i.cadence] ?? i.cadence}</td>
-                    <td>{i.dayOfMonth ? `jeden ${i.dayOfMonth}.` : "-"}</td>
+                    <td className="hide-phone">{i.dayOfMonth ? `jeden ${i.dayOfMonth}.` : "-"}</td>
                     <td className="num">{euro(monthly(i.amount, i.cadence), i.currency)}</td>
-                    <td className="num">{euro(yearly(i.amount, i.cadence), i.currency)}</td>
-                    <td className="num">
+                    <td className="num hide-phone">{euro(yearly(i.amount, i.cadence), i.currency)}</td>
+                    <td className="num action-cell">
+                      <div className="action-stack">
                       <button className="btn ghost small icon-only" aria-label={i.isActive ? "Einnahme pausieren" : "Einnahme aktivieren"} title={i.isActive ? "Einnahme pausieren" : "Einnahme aktivieren"} onClick={() => toggleIncome(i)}>
                         <i className={`fa-solid ${i.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
                         <span className="sr-only">Status</span>
@@ -1070,10 +1077,11 @@ export default function Finance() {
                         <i className="fa-solid fa-pen-to-square" aria-hidden />
                         <span className="sr-only">Bearbeiten</span>
                       </button>{" "}
-                      <button className="btn danger small icon-only" aria-label="Einnahme l\u00F6schen" title="Einnahme l\u00F6schen" onClick={() => removeIncome(i.id)}>
+                      <button className="btn danger small icon-only" aria-label="Einnahme löschen" title="Einnahme löschen" onClick={() => removeIncome(i.id)}>
                         <i className="fa-solid fa-trash" aria-hidden />
-                        <span className="sr-only">L\u00F6schen</span>
+                        <span className="sr-only">Löschen</span>
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

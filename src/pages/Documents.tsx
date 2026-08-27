@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, getToken } from "../api/client";
 import type { Doc } from "../api/types";
 import { useDialog } from "../components/Dialog";
@@ -10,7 +10,7 @@ import { useAsync } from "../lib/useAsync";
 const categories = ["family", "authority", "finance", "tax", "home", "travel", "insurance", "other"];
 const categoryLabels: Record<string, string> = {
   family: "Familie", authority: "Behörden", finance: "Finanzen", tax: "Steuern",
-  home: "Zuhause", travel: "Reisen", insurance: "Versicherung", other: "Sonstiges",
+  home: "Allgemein", travel: "Reisen", insurance: "Versicherung", other: "Sonstiges",
 };
 
 type DriveFile = {
@@ -22,38 +22,105 @@ type DriveFile = {
   webViewLink?: string;
 };
 
+const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
+const DRIVE_TOKEN_KEY = "ld_drive_access_token";
+const DRIVE_TOKEN_EXP_KEY = "ld_drive_access_token_expires";
+const DRIVE_PATH_KEY = "ld_drive_path";
+const DRIVE_FOLDER_KEY = "ld_drive_folder";
+
+const DRIVE_EXPORT_MIME: Record<string, { mime: string; ext: string }> = {
+  "application/vnd.google-apps.document": { mime: "application/pdf", ext: "pdf" },
+  "application/vnd.google-apps.spreadsheet": { mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ext: "xlsx" },
+  "application/vnd.google-apps.presentation": { mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", ext: "pptx" },
+  "application/vnd.google-apps.drawing": { mime: "image/png", ext: "png" },
+};
+
 export default function Documents() {
   const docs = useAsync<Doc[]>(() => api.get("/api/documents"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
   const [driveInfo, setDriveInfo] = useState<string | null>(null);
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
+  const [drivePath, setDrivePath] = useState<Array<{ id: string; name: string }>>([{ id: "root", name: "Meine Ablage" }]);
+  const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
   const [filter, setFilter] = useState("all");
   const [driveBusy, setDriveBusy] = useState(false);
   const fileFor = useRef<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const driveToken = useRef<string | null>(null);
+  const driveTokenExpiresAt = useRef<number>(0);
   const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
+
+  function persistDrivePath(path: Array<{ id: string; name: string }>) {
+    sessionStorage.setItem(DRIVE_PATH_KEY, JSON.stringify(path));
+    const current = path[path.length - 1]?.id ?? "root";
+    sessionStorage.setItem(DRIVE_FOLDER_KEY, current);
+  }
+
+  useEffect(() => {
+    const storedToken = sessionStorage.getItem(DRIVE_TOKEN_KEY);
+    const storedExp = Number(sessionStorage.getItem(DRIVE_TOKEN_EXP_KEY) ?? "0");
+    if (storedToken && storedExp > Date.now()) {
+      driveToken.current = storedToken;
+      driveTokenExpiresAt.current = storedExp;
+
+      const rawPath = sessionStorage.getItem(DRIVE_PATH_KEY);
+      const rawFolder = sessionStorage.getItem(DRIVE_FOLDER_KEY);
+      let startPath: Array<{ id: string; name: string }> = [{ id: "root", name: "Meine Ablage" }];
+      let startFolder = rawFolder || "root";
+
+      if (rawPath) {
+        try {
+          const parsed = JSON.parse(rawPath) as Array<{ id: string; name: string }>;
+          if (Array.isArray(parsed) && parsed.length > 0) startPath = parsed;
+        } catch {
+          // ignore invalid session state
+        }
+      }
+
+      setDrivePath(startPath);
+
+      void (async () => {
+        setDriveBusy(true);
+        try {
+          const files = await fetchDriveFiles(startFolder, storedToken);
+          setDriveFiles(files);
+          setDriveInfo(`${files.length} Einträge in ${startPath[startPath.length - 1]?.name ?? "Meine Ablage"} geladen.`);
+        } catch {
+          // token may be expired/revoked; ignore and wait for explicit reconnect
+        } finally {
+          setDriveBusy(false);
+        }
+      })();
+    }
+  }, []);
 
   function getGoogle() {
     return (window as unknown as { google?: any }).google;
   }
 
-  async function ensureDriveToken() {
+  async function ensureDriveToken(forceRefresh = false) {
     const g = getGoogle();
     if (!googleClientId) throw new Error("Google Drive: setze VITE_GOOGLE_CLIENT_ID im Frontend.");
     if (!g?.accounts?.oauth2) throw new Error("Google Drive API ist noch nicht geladen.");
+
+    const stillValid = !!driveToken.current && driveTokenExpiresAt.current > Date.now() + 30_000;
+    if (!forceRefresh && stillValid && driveToken.current) return driveToken.current;
 
     return await new Promise<string>((resolve, reject) => {
       const tokenClient = g.accounts.oauth2.initTokenClient({
         client_id: googleClientId,
         scope: "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file",
-        callback: (resp: { access_token?: string; error?: string }) => {
+        callback: (resp: { access_token?: string; error?: string; expires_in?: number }) => {
           if (resp.error || !resp.access_token) {
             reject(new Error(resp.error || "Google Drive Auth fehlgeschlagen."));
             return;
           }
           driveToken.current = resp.access_token;
+          const expAt = Date.now() + Math.max(60, Number(resp.expires_in ?? 3600)) * 1000;
+          driveTokenExpiresAt.current = expAt;
+          sessionStorage.setItem(DRIVE_TOKEN_KEY, resp.access_token);
+          sessionStorage.setItem(DRIVE_TOKEN_EXP_KEY, String(expAt));
           resolve(resp.access_token);
         },
       });
@@ -68,9 +135,12 @@ export default function Documents() {
     setDriveBusy(true);
     try {
       const token = await ensureDriveToken();
-      const files = await fetchDriveFiles(token);
+      const rootPath = [{ id: "root", name: "Meine Ablage" }];
+      setDrivePath(rootPath);
+      persistDrivePath(rootPath);
+      const files = await fetchDriveFiles("root", token);
       setDriveFiles(files);
-      setDriveInfo(`Google Drive ist verbunden. ${files.length} Dateien geladen.`);
+      setDriveInfo(`Google Drive ist verbunden. ${files.length} Einträge in Meine Ablage geladen.`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -78,9 +148,10 @@ export default function Documents() {
     }
   }
 
-  async function fetchDriveFiles(token?: string) {
+  async function fetchDriveFiles(folderId = "root", token?: string) {
     const accessToken = token ?? await ensureDriveToken();
-    const res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=50&orderBy=modifiedTime desc&fields=files(id,name,mimeType,modifiedTime,size,webViewLink)&q=trashed=false", {
+    const query = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?pageSize=100&orderBy=folder,name_natural&fields=files(id,name,mimeType,modifiedTime,size,webViewLink)&q=${query}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) {
@@ -120,7 +191,8 @@ export default function Documents() {
     setDriveInfo(null);
     setDriveBusy(true);
     try {
-      const files = await fetchDriveFiles();
+      const currentFolderId = drivePath[drivePath.length - 1]?.id ?? "root";
+      const files = await fetchDriveFiles(currentFolderId);
       setDriveFiles(files);
       setDriveInfo(`${files.length} Drive-Dateien aktualisiert.`);
     } catch (e) {
@@ -168,7 +240,8 @@ export default function Documents() {
     setDriveInfo(null);
     setDriveBusy(true);
     try {
-      const files = driveFiles.length > 0 ? driveFiles : await fetchDriveFiles();
+      const currentFolderId = drivePath[drivePath.length - 1]?.id ?? "root";
+      const files = driveFiles.length > 0 ? driveFiles : await fetchDriveFiles(currentFolderId);
       if (files.length === 0) throw new Error("Keine Dateien in Google Drive gefunden.");
 
       setDriveFiles(files);
@@ -199,7 +272,100 @@ export default function Documents() {
 
       const chosen = files.find((f) => f.id === String(values.fileId));
       if (!chosen) return;
+      if (chosen.mimeType === DRIVE_FOLDER_MIME) {
+        throw new Error("Ordner können nicht importiert werden. Bitte eine Datei wählen.");
+      }
       await importDriveFile(chosen, String(values.category));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  async function openDriveFolder(folder: { id: string; name: string }) {
+    setError(null);
+    setDriveInfo(null);
+    setPreviewFile(null);
+    setDriveBusy(true);
+    try {
+      const files = await fetchDriveFiles(folder.id);
+      setDriveFiles(files);
+      setDrivePath((prev) => {
+        const next = [...prev, folder];
+        persistDrivePath(next);
+        return next;
+      });
+      setDriveInfo(`${files.length} Einträge in ${folder.name} geladen.`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  async function jumpToPath(index: number) {
+    const target = drivePath[index];
+    if (!target) return;
+    setError(null);
+    setDriveInfo(null);
+    setPreviewFile(null);
+    setDriveBusy(true);
+    try {
+      const files = await fetchDriveFiles(target.id);
+      setDriveFiles(files);
+      setDrivePath((prev) => {
+        const next = prev.slice(0, index + 1);
+        persistDrivePath(next);
+        return next;
+      });
+      setDriveInfo(`${files.length} Einträge in ${target.name} geladen.`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  function openPreview(file: DriveFile) {
+    setPreviewFile(file);
+  }
+
+  async function downloadDriveFile(file: DriveFile) {
+    if (file.mimeType === DRIVE_FOLDER_MIME) return;
+    setError(null);
+    setDriveInfo(null);
+    setDriveBusy(true);
+    try {
+      const token = await ensureDriveToken();
+      const isGoogleNative = !!file.mimeType?.startsWith("application/vnd.google-apps.");
+      const exportCfg = isGoogleNative
+        ? (DRIVE_EXPORT_MIME[file.mimeType ?? ""] ?? { mime: "application/pdf", ext: "pdf" })
+        : null;
+
+      const url = isGoogleNative
+        ? `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=${encodeURIComponent(exportCfg!.mime)}`
+        : `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("Drive-Datei konnte nicht heruntergeladen werden.");
+
+      const blob = await res.blob();
+      let fileName = file.name;
+      if (exportCfg && !fileName.toLowerCase().endsWith(`.${exportCfg.ext}`)) {
+        fileName = `${fileName}.${exportCfg.ext}`;
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+
+      setDriveInfo(`Datei \"${fileName}\" wurde heruntergeladen.`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -213,8 +379,10 @@ export default function Documents() {
     setDriveBusy(true);
     try {
       const token = await ensureDriveToken();
-      const available = (docs.data ?? []).filter((d) => !!d.originalName);
-      if (available.length === 0) throw new Error("Kein lokales Dokument mit Datei zum Hochladen vorhanden.");
+      const available = (docs.data ?? []).filter((d) => !!d.originalName && !!d.storagePath);
+      if (available.length === 0) {
+        throw new Error("Kein lokales Dokument mit gespeicherter Datei zum Hochladen vorhanden. Lade zuerst eine Datei im Dokumenteintrag hoch.");
+      }
 
       const values = await dialog.form({
         title: "Dokument nach Google Drive hochladen",
@@ -242,7 +410,15 @@ export default function Documents() {
       const fileRes = await fetch(api.fileUrl(selected.id), {
         headers: { Authorization: `Bearer ${jwt}` },
       });
-      if (!fileRes.ok) throw new Error("Dokumentdatei konnte nicht geladen werden.");
+      if (!fileRes.ok) {
+        if (fileRes.status === 404) {
+          throw new Error("Die Datei zum Dokument wurde auf dem Server nicht gefunden. Bitte Datei im Dokument neu hochladen und erneut versuchen.");
+        }
+        if (fileRes.status >= 500) {
+          throw new Error("Die Dokumentdatei konnte serverseitig nicht gelesen werden. Bitte Datei im Dokument neu hochladen und erneut versuchen.");
+        }
+        throw new Error(`Dokumentdatei konnte nicht geladen werden (${fileRes.status}).`);
+      }
 
       const blob = await fileRes.blob();
       const filename = selected.originalName || `${selected.title}.bin`;
@@ -407,39 +583,132 @@ export default function Documents() {
 
         {driveFiles.length > 0 && (
           <div style={{ marginTop: 10 }}>
-            <table>
+            <div className="row" style={{ marginBottom: 10, gap: 6, flexWrap: "wrap" }}>
+              {drivePath.map((p, i) => (
+                <button
+                  key={`${p.id}-${i}`}
+                  className={`chip ${i === drivePath.length - 1 ? "on" : ""}`}
+                  onClick={() => jumpToPath(i)}
+                  disabled={driveBusy}
+                  title={p.name}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <div className="table-scroll docs-drive-table">
+            <table className="docs-table">
               <thead>
-                <tr><th>Drive-Datei</th><th>Typ</th><th>Geändert</th><th className="num">Aktion</th></tr>
+                <tr><th>Drive-Datei</th><th>Typ</th><th>Geändert</th><th className="num action-col">Aktion</th></tr>
               </thead>
               <tbody>
                 {driveFiles.slice(0, 20).map((f) => (
                   <tr key={f.id}>
                     <td>
-                      <a href={f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`} target="_blank" rel="noreferrer">{f.name}</a>
+                      {f.mimeType === DRIVE_FOLDER_MIME ? (
+                        <button
+                          className="btn ghost small"
+                          onClick={() => openDriveFolder({ id: f.id, name: f.name })}
+                          disabled={driveBusy}
+                          title="Ordner öffnen"
+                        >
+                          <i className="fa-solid fa-folder-open" aria-hidden /> {f.name}
+                        </button>
+                      ) : (
+                        <a href={f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`} target="_blank" rel="noreferrer">{f.name}</a>
+                      )}
                     </td>
-                    <td>{f.mimeType ?? "-"}</td>
+                    <td>{f.mimeType === DRIVE_FOLDER_MIME ? "Ordner" : (f.mimeType ?? "-")}</td>
                     <td>{f.modifiedTime ? new Date(f.modifiedTime).toLocaleString("de-DE") : "-"}</td>
-                    <td className="num">
-                      <button
-                        className="btn ghost small icon-only"
-                        aria-label="Drive-Datei importieren"
-                        title="Drive-Datei importieren"
-                        onClick={() => importDriveFile(f)}
-                        disabled={driveBusy}
-                      >
-                        <i className="fa-solid fa-file-import" aria-hidden />
-                        <span className="sr-only">Importieren</span>
-                      </button>
+                    <td className="num action-cell">
+                      <div className="action-stack">
+                      {f.mimeType !== DRIVE_FOLDER_MIME && (
+                        <>
+                          <button
+                            className="btn ghost small icon-only"
+                            aria-label="Datei herunterladen"
+                            title="Datei herunterladen"
+                            onClick={() => downloadDriveFile(f)}
+                            disabled={driveBusy}
+                          >
+                            <i className="fa-solid fa-download" aria-hidden />
+                            <span className="sr-only">Herunterladen</span>
+                          </button>{" "}
+                          <button
+                            className="btn ghost small icon-only"
+                            aria-label="Vorschau in App"
+                            title="Vorschau in App"
+                            onClick={() => openPreview(f)}
+                            disabled={driveBusy}
+                          >
+                            <i className="fa-solid fa-eye" aria-hidden />
+                            <span className="sr-only">Vorschau</span>
+                          </button>{" "}
+                          <button
+                            className="btn ghost small icon-only"
+                            aria-label="Drive-Datei importieren"
+                            title="Drive-Datei importieren"
+                            onClick={() => importDriveFile(f)}
+                            disabled={driveBusy}
+                          >
+                            <i className="fa-solid fa-file-import" aria-hidden />
+                            <span className="sr-only">Importieren</span>
+                          </button>
+                        </>
+                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
             {driveFiles.length > 20 && (
               <p className="auth-hint" style={{ marginTop: 8 }}>
                 Es werden 20 von {driveFiles.length} Drive-Dateien angezeigt. Mit Aktualisieren lädst du die aktuelle Liste neu.
               </p>
             )}
+          </div>
+        )}
+
+        {previewFile && (
+          <div style={{ marginTop: 14 }}>
+            <div className="row" style={{ marginBottom: 8 }}>
+              <strong>Vorschau: {previewFile.name}</strong>
+              <div className="spacer" />
+              <button
+                className="btn ghost small icon-only"
+                aria-label="Datei herunterladen"
+                title="Datei herunterladen"
+                onClick={() => downloadDriveFile(previewFile)}
+              >
+                <i className="fa-solid fa-download" aria-hidden />
+                <span className="sr-only">Datei herunterladen</span>
+              </button>{" "}
+              <a
+                className="btn ghost small icon-only"
+                href={previewFile.webViewLink || `https://drive.google.com/file/d/${previewFile.id}/view`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="In Google Drive öffnen"
+                title="In Google Drive öffnen"
+              >
+                <i className="fa-solid fa-up-right-from-square" aria-hidden />
+                <span className="sr-only">In Google Drive öffnen</span>
+              </a>{" "}
+              <button className="btn ghost small icon-only" aria-label="Vorschau schließen" title="Vorschau schließen" onClick={() => setPreviewFile(null)}>
+                <i className="fa-solid fa-xmark" aria-hidden />
+                <span className="sr-only">Vorschau schließen</span>
+              </button>
+            </div>
+            <iframe
+              title={`Drive Vorschau ${previewFile.name}`}
+              src={`https://drive.google.com/file/d/${previewFile.id}/preview`}
+              style={{ width: "100%", minHeight: 420, border: "1px solid var(--line)", borderRadius: 10, background: "#fff" }}
+            />
+            <p className="auth-hint" style={{ marginTop: 8 }}>
+              Hinweis: Manche Dateitypen oder Freigaben erlauben keine eingebettete Vorschau. Dann bitte über das Öffnen-Symbol in Google Drive ansehen.
+            </p>
           </div>
         )}
       </div>
@@ -458,9 +727,9 @@ export default function Documents() {
       <div className="card">
         {list.length === 0
           ? <Empty title="Keine Dokumente in dieser Kategorie." hint="Lege ein Dokument über das Plus an und lade die Datei hoch." />
-          : <table>
+          : <div className="table-scroll docs-main-table"><table className="docs-table">
               <thead>
-                <tr><th>Dokument</th><th>Kategorie</th><th>Läuft ab</th><th>Datei</th><th className="num">Aktion</th></tr>
+                <tr><th>Dokument</th><th>Kategorie</th><th>Läuft ab</th><th>Datei</th><th className="num action-col">Aktion</th></tr>
               </thead>
               <tbody>
                 {list.map((d) => {
@@ -481,7 +750,8 @@ export default function Documents() {
                           ? <a href={api.fileUrl(d.id)} target="_blank" rel="noreferrer">{d.originalName}</a>
                           : <span className="alert-msg">keine Datei</span>}
                       </td>
-                      <td className="num">
+                      <td className="num action-cell">
+                        <div className="action-stack">
                         <button className="btn ghost small icon-only" aria-label="Dokument bearbeiten" title="Dokument bearbeiten" onClick={() => editDoc(d)}>
                           <i className="fa-solid fa-pen-to-square" aria-hidden />
                           <span className="sr-only">Bearbeiten</span>
@@ -494,12 +764,13 @@ export default function Documents() {
                           <i className="fa-solid fa-trash" aria-hidden />
                           <span className="sr-only">Löschen</span>
                         </button>
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
-            </table>}
+            </table></div>}
 
       </div>
     </>

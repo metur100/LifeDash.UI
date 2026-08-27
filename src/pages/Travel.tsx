@@ -342,7 +342,7 @@ export default function Travel() {
             {trip.bookings.length === 0
               ? <Empty title="Noch nichts gebucht." hint="Flüge, Hotels und Mietwagen landen hier." />
               : <table>
-                  <thead><tr><th>Buchung</th><th className="num">Betrag</th><th className="num">Aktion</th></tr></thead>
+                  <thead><tr><th>Buchung</th><th className="num">Betrag</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
                     {trip.bookings.map((b) => (
                       <tr key={b.id}>
@@ -354,7 +354,8 @@ export default function Travel() {
                           </div>
                         </td>
                         <td className="num">{b.amount ? euro(b.amount, b.currency) : "—"}</td>
-                        <td className="num">
+                        <td className="num action-cell">
+                          <div className="action-stack">
                           <button className="btn ghost small icon-only" aria-label="Buchung bearbeiten" title="Buchung bearbeiten" onClick={() => editBooking(trip, b.id)}>
                             <i className="fa-solid fa-pen-to-square" aria-hidden />
                             <span className="sr-only">Bearbeiten</span>
@@ -363,6 +364,7 @@ export default function Travel() {
                             <i className="fa-solid fa-trash" aria-hidden />
                             <span className="sr-only">Löschen</span>
                           </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -415,7 +417,8 @@ export default function Travel() {
                     <td><strong>{t.title}</strong><div className="alert-msg">{t.destination}</div></td>
                     <td>{shortDate(t.startsOn)}</td>
                     <td className="num"><span className="badge">{t.status}</span></td>
-                    <td className="num">
+                    <td className="num action-cell">
+                      <div className="action-stack">
                       <button className="btn ghost small icon-only" aria-label="Reise öffnen" title="Reise öffnen" onClick={() => setSelectedTripId(t.id)}>
                         <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden />
                         <span className="sr-only">Öffnen</span>
@@ -428,6 +431,7 @@ export default function Travel() {
                         <i className="fa-solid fa-trash" aria-hidden />
                         <span className="sr-only">Löschen</span>
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -9,7 +9,7 @@ import { useAsync } from "../lib/useAsync";
 const modules = ["general", "family", "authority", "finance", "home", "travel"];
 const moduleLabels: Record<string, string> = {
   general: "Allgemein", family: "Familie", authority: "Behörden",
-  finance: "Finanzen", home: "Zuhause", travel: "Reisen",
+  finance: "Finanzen", home: "Allgemein", travel: "Reisen",
 };
 
 export default function Tasks() {

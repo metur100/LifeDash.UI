@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Appointment, FamilyMember, ImportantDate } from "../api/types";
 import { useDialog } from "../components/Dialog";
@@ -6,12 +6,90 @@ import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
 import { countdown, dateTime, daysUntil, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
+type PersonMeta = {
+  heightCm: string;
+  weightKg: string;
+  bloodType: string;
+  allergies: string;
+  medication: string;
+};
+
+const META_START = "[profile-meta]";
+const META_END = "[/profile-meta]";
+
+function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
+  const empty: PersonMeta = {
+    heightCm: "",
+    weightKg: "",
+    bloodType: "",
+    allergies: "",
+    medication: "",
+  };
+  const text = notes ?? "";
+  const start = text.indexOf(META_START);
+  const end = text.indexOf(META_END);
+  if (start < 0 || end < 0 || end <= start) return { meta: empty };
+
+  const raw = text.slice(start + META_START.length, end).trim();
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  const kv = new Map<string, string>();
+  for (const line of lines) {
+    const idx = line.indexOf(":");
+    if (idx <= 0) continue;
+    kv.set(line.slice(0, idx).trim(), line.slice(idx + 1).trim());
+  }
+
+  return {
+    meta: {
+      heightCm: kv.get("heightCm") ?? "",
+      weightKg: kv.get("weightKg") ?? "",
+      bloodType: kv.get("bloodType") ?? "",
+      allergies: kv.get("allergies") ?? "",
+      medication: kv.get("medication") ?? "",
+    },
+  };
+}
+
+function buildPersonNotes(meta: PersonMeta): string | null {
+  const lines = [
+    `heightCm:${meta.heightCm.trim()}`,
+    `weightKg:${meta.weightKg.trim()}`,
+    `bloodType:${meta.bloodType.trim()}`,
+    `allergies:${meta.allergies.trim()}`,
+    `medication:${meta.medication.trim()}`,
+  ];
+  const hasAnyMeta = lines.some((x) => x.split(":")[1]?.trim());
+  if (!hasAnyMeta) return null;
+  return `${META_START}\n${lines.join("\n")}\n${META_END}`;
+}
+
+function dateIso(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function monthStartDate(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function monthEndDate(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+function addMonth(d: Date, delta: number) {
+  return new Date(d.getFullYear(), d.getMonth() + delta, 1);
+}
+
 export default function Family() {
   const members = useAsync<FamilyMember[]>(() => api.get("/api/family-members"), []);
   const appts = useAsync<Appointment[]>(() => api.get("/api/appointments"), []);
   const dates = useAsync<ImportantDate[]>(() => api.get("/api/important-dates"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
+  const [monthCursor, setMonthCursor] = useState(() => monthStartDate(new Date()));
 
   async function addMember() {
     const values = await dialog.form({
@@ -27,26 +105,42 @@ export default function Family() {
         ] },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
-        { key: "notes", label: "Notizen" },
+        { key: "heightCm", label: "Größe (cm)", type: "number" },
+        { key: "weightKg", label: "Gewicht (kg)", type: "number" },
+        { key: "bloodType", label: "Blutgruppe" },
+        { key: "allergies", label: "Allergien" },
+        { key: "medication", label: "Medikamente" },
       ],
       initial: {
         fullName: "",
         relation: "self",
         birthDate: "",
         nationality: "",
-        notes: "",
+        heightCm: "",
+        weightKg: "",
+        bloodType: "",
+        allergies: "",
+        medication: "",
       },
     });
     if (!values) return;
     if (!String(values.fullName).trim()) return;
 
     try {
+      const notes = buildPersonNotes({
+        heightCm: String(values.heightCm ?? ""),
+        weightKg: String(values.weightKg ?? ""),
+        bloodType: String(values.bloodType ?? ""),
+        allergies: String(values.allergies ?? ""),
+        medication: String(values.medication ?? ""),
+      });
+
       await api.post("/api/family-members", {
         fullName: String(values.fullName).trim(),
         relation: String(values.relation).trim() || null,
         birthDate: String(values.birthDate).trim() || null,
         nationality: String(values.nationality).trim() || null,
-        notes: String(values.notes).trim() || null,
+        notes,
       });
       members.reload();
     } catch (e) { setError((e as Error).message); }
@@ -67,6 +161,7 @@ export default function Family() {
   }
 
   async function editMember(m: FamilyMember) {
+    const parsed = parsePersonMeta(m.notes);
     const values = await dialog.form({
       title: "Person bearbeiten",
       fields: [
@@ -80,26 +175,42 @@ export default function Family() {
         ] },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
-        { key: "notes", label: "Notizen" },
+        { key: "heightCm", label: "Größe (cm)", type: "number" },
+        { key: "weightKg", label: "Gewicht (kg)", type: "number" },
+        { key: "bloodType", label: "Blutgruppe" },
+        { key: "allergies", label: "Allergien" },
+        { key: "medication", label: "Medikamente" },
       ],
       initial: {
         fullName: m.fullName,
         relation: m.relation ?? "",
         birthDate: m.birthDate ?? "",
         nationality: m.nationality ?? "",
-        notes: m.notes ?? "",
+        heightCm: parsed.meta.heightCm,
+        weightKg: parsed.meta.weightKg,
+        bloodType: parsed.meta.bloodType,
+        allergies: parsed.meta.allergies,
+        medication: parsed.meta.medication,
       },
     });
     if (!values) return;
 
     try {
+      const notes = buildPersonNotes({
+        heightCm: String(values.heightCm ?? ""),
+        weightKg: String(values.weightKg ?? ""),
+        bloodType: String(values.bloodType ?? ""),
+        allergies: String(values.allergies ?? ""),
+        medication: String(values.medication ?? ""),
+      });
+
       await api.put(`/api/family-members/${m.id}`, {
         ...m,
         fullName: String(values.fullName).trim(),
         relation: String(values.relation).trim() || null,
         birthDate: String(values.birthDate).trim() || null,
         nationality: String(values.nationality).trim() || null,
-        notes: String(values.notes).trim() || null,
+        notes,
       });
       members.reload();
     } catch (e) { setError((e as Error).message); }
@@ -115,17 +226,24 @@ export default function Family() {
   }
 
   async function editAppointment(a: Appointment) {
+    const memberOptions = [
+      { value: "", label: "-" },
+      ...(members.data ?? []).map((m) => ({ value: String(m.id), label: m.fullName })),
+    ];
+
     const values = await dialog.form({
       title: "Termin bearbeiten",
       fields: [
         { key: "title", label: "Termin" },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
+        { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
       ],
       initial: {
         title: a.title,
         startsAt: a.startsAt.slice(0, 16),
         location: a.location ?? "",
+        familyMemberId: a.familyMemberId ? String(a.familyMemberId) : "",
       },
     });
     if (!values) return;
@@ -136,6 +254,7 @@ export default function Family() {
         title: String(values.title).trim(),
         startsAt: String(values.startsAt).trim() ? new Date(String(values.startsAt)).toISOString() : a.startsAt,
         location: String(values.location).trim() || null,
+        familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
       });
       appts.reload();
     } catch (e) { setError((e as Error).message); }
@@ -195,6 +314,11 @@ export default function Family() {
   }
 
   async function addAppointment() {
+    const memberOptions = [
+      { value: "", label: "-" },
+      ...(members.data ?? []).map((m) => ({ value: String(m.id), label: m.fullName })),
+    ];
+
     const values = await dialog.form({
       title: "Termin anlegen",
       submitText: "Anlegen",
@@ -208,12 +332,14 @@ export default function Family() {
           { value: "health", label: "health" },
           { value: "home", label: "home" },
         ] },
+        { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
       ],
       initial: {
         title: "",
         startsAt: "",
         location: "",
         category: "family",
+        familyMemberId: "",
       },
     });
     if (!values) return;
@@ -225,6 +351,57 @@ export default function Family() {
         startsAt: new Date(String(values.startsAt)).toISOString(),
         location: String(values.location).trim() || null,
         category: String(values.category),
+        familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
+        reminderDays: 3,
+        isDone: false,
+      });
+      appts.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function addAppointmentAtDate(dayIso: string) {
+    const memberOptions = [
+      { value: "", label: "-" },
+      ...(members.data ?? []).map((m) => ({ value: String(m.id), label: m.fullName })),
+    ];
+
+    const values = await dialog.form({
+      title: "Termin im Kalender anlegen",
+      submitText: "Anlegen",
+      fields: [
+        { key: "title", label: "Termin" },
+        { key: "startsAt", label: "Start", type: "datetime-local" },
+        { key: "location", label: "Ort" },
+        { key: "category", label: "Kategorie", type: "select", options: [
+          { value: "family", label: "family" },
+          { value: "authority", label: "authority" },
+          { value: "health", label: "health" },
+          { value: "home", label: "home" },
+        ] },
+        { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
+      ],
+      initial: {
+        title: "",
+        startsAt: `${dayIso}T09:00`,
+        location: "",
+        category: "family",
+        familyMemberId: "",
+      },
+    });
+    if (!values) return;
+    if (!String(values.title).trim()) return;
+
+    const startsAt = String(values.startsAt).trim()
+      ? new Date(String(values.startsAt)).toISOString()
+      : new Date(`${dayIso}T09:00:00`).toISOString();
+
+    try {
+      await api.post("/api/appointments", {
+        title: String(values.title).trim(),
+        startsAt,
+        location: String(values.location).trim() || null,
+        category: String(values.category),
+        familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
         reminderDays: 3,
         isDone: false,
       });
@@ -270,6 +447,41 @@ export default function Family() {
   const doneAppointments = (appts.data ?? [])
     .filter((a) => a.isDone)
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  const memberNameById = new Map((members.data ?? []).map((m) => [m.id, m.fullName]));
+  const apptByDay = useMemo(() => {
+    const map = new Map<string, Appointment[]>();
+    for (const a of (appts.data ?? []).filter((x) => !x.isDone)) {
+      const day = a.startsAt.slice(0, 10);
+      const list = map.get(day) ?? [];
+      list.push(a);
+      map.set(day, list);
+    }
+    return map;
+  }, [appts.data]);
+
+  const calendarCells = useMemo(() => {
+    const start = monthStartDate(monthCursor);
+    const end = monthEndDate(monthCursor);
+    const offset = (start.getDay() + 6) % 7;
+    const totalDays = end.getDate();
+    const cells: Array<{ iso: string; day: number; inMonth: boolean }> = [];
+
+    for (let i = 0; i < offset; i += 1) {
+      const d = new Date(start);
+      d.setDate(1 - (offset - i));
+      cells.push({ iso: dateIso(d), day: d.getDate(), inMonth: false });
+    }
+    for (let day = 1; day <= totalDays; day += 1) {
+      const d = new Date(start.getFullYear(), start.getMonth(), day);
+      cells.push({ iso: dateIso(d), day, inMonth: true });
+    }
+    while (cells.length % 7 !== 0) {
+      const d = new Date(end);
+      d.setDate(d.getDate() + (cells.length % 7));
+      cells.push({ iso: dateIso(d), day: d.getDate(), inMonth: false });
+    }
+    return cells;
+  }, [monthCursor]);
 
   return (
     <>
@@ -280,15 +492,27 @@ export default function Family() {
       <Section title="Personen" action={<button className="btn icon-only" aria-label="Person hinzufügen" title="Person hinzufügen" onClick={addMember}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Person hinzufügen</span></button>}>
         <div className="card">
           <table>
-            <thead><tr><th>Name</th><th>Rolle</th><th>Geburtstag</th><th>Staatsangehörigkeit</th><th className="num">Aktion</th></tr></thead>
+            <thead><tr><th>Name</th><th>Rolle</th><th>Geburtstag</th><th>Staatsangehörigkeit</th><th className="num action-col">Aktion</th></tr></thead>
             <tbody>
               {(members.data ?? []).map((m) => (
                 <tr key={m.id}>
-                  <td><strong>{m.fullName}</strong></td>
+                  <td>
+                    <strong>{m.fullName}</strong>
+                    {(() => {
+                      const parsed = parsePersonMeta(m.notes);
+                      const meta: string[] = [];
+                      if (parsed.meta.heightCm) meta.push(`${parsed.meta.heightCm} cm`);
+                      if (parsed.meta.weightKg) meta.push(`${parsed.meta.weightKg} kg`);
+                      if (parsed.meta.bloodType) meta.push(`Blutgruppe ${parsed.meta.bloodType}`);
+                      if (parsed.meta.allergies) meta.push(`Allergien: ${parsed.meta.allergies}`);
+                      return meta.length > 0 ? <div className="alert-msg">{meta.join(" · ")}</div> : null;
+                    })()}
+                  </td>
                   <td>{m.relation ?? "—"}</td>
                   <td>{shortDate(m.birthDate)}</td>
                   <td>{m.nationality ?? "—"}</td>
-                  <td className="num">
+                  <td className="num action-cell">
+                    <div className="action-stack">
                     <button className="btn ghost small icon-only" aria-label="Person bearbeiten" title="Person bearbeiten" onClick={() => editMember(m)}>
                       <i className="fa-solid fa-pen-to-square" aria-hidden />
                       <span className="sr-only">Bearbeiten</span>
@@ -297,6 +521,7 @@ export default function Family() {
                       <i className="fa-solid fa-trash" aria-hidden />
                       <span className="sr-only">Löschen</span>
                     </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -308,6 +533,48 @@ export default function Family() {
 
       <div className="grid-2">
         <Section title="Termine" action={<button className="btn icon-only" aria-label="Termin anlegen" title="Termin anlegen" onClick={addAppointment}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Termin anlegen</span></button>}>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="row" style={{ marginBottom: 10 }}>
+              <button className="btn ghost small icon-only" aria-label="Vorheriger Monat" title="Vorheriger Monat" onClick={() => setMonthCursor((m) => addMonth(m, -1))}>
+                <i className="fa-solid fa-chevron-left" aria-hidden />
+                <span className="sr-only">Vorheriger Monat</span>
+              </button>
+              <strong style={{ minWidth: 170, textAlign: "center" }}>
+                {monthCursor.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}
+              </strong>
+              <button className="btn ghost small icon-only" aria-label="Nächster Monat" title="Nächster Monat" onClick={() => setMonthCursor((m) => addMonth(m, 1))}>
+                <i className="fa-solid fa-chevron-right" aria-hidden />
+                <span className="sr-only">Nächster Monat</span>
+              </button>
+              <div className="spacer" />
+              <button className="btn ghost small" onClick={() => setMonthCursor(monthStartDate(new Date()))}>Heute</button>
+            </div>
+
+            <div className="family-calendar">
+              {[
+                "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So",
+              ].map((wd) => <div key={wd} className="family-calendar-wd">{wd}</div>)}
+
+              {calendarCells.map((cell) => {
+                const items = apptByDay.get(cell.iso) ?? [];
+                return (
+                  <button
+                    key={cell.iso}
+                    className={`family-calendar-cell ${cell.inMonth ? "" : "out"}`}
+                    onClick={() => addAppointmentAtDate(cell.iso)}
+                    title="Termin anlegen"
+                  >
+                    <span className="day">{cell.day}</span>
+                    {items.slice(0, 2).map((a) => (
+                      <span key={a.id} className="appt">{a.title}</span>
+                    ))}
+                    {items.length > 2 && <span className="appt more">+{items.length - 2}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {upcoming.length === 0
             ? <Empty title="Keine offenen Termine." hint="Neue Termine erscheinen hier, sobald du sie anlegst." />
             : <div className="card">
@@ -317,12 +584,16 @@ export default function Family() {
                       <tr key={a.id}>
                         <td>
                           <strong>{a.title}</strong>
-                          <div className="alert-msg">{dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}</div>
+                          <div className="alert-msg">
+                            {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
+                            {a.familyMemberId ? ` · ${memberNameById.get(a.familyMemberId) ?? "Person"}` : ""}
+                          </div>
                         </td>
                         <td className="num">
                           <span className="badge">{countdown(daysUntil(a.startsAt.slice(0, 10)))}</span>
                         </td>
-                        <td className="num">
+                        <td className="num action-cell">
+                          <div className="action-stack">
                           <button className="btn ghost small icon-only" aria-label="Termin als erledigt markieren" title="Termin als erledigt markieren" onClick={() => completeAppointment(a)}>
                             <i className="fa-solid fa-check" aria-hidden />
                             <span className="sr-only">Erledigt</span>
@@ -335,6 +606,7 @@ export default function Family() {
                             <i className="fa-solid fa-trash" aria-hidden />
                             <span className="sr-only">Löschen</span>
                           </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -350,9 +622,13 @@ export default function Family() {
                     <tr key={a.id}>
                       <td>
                         <strong>{a.title}</strong>
-                        <div className="alert-msg">{dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}</div>
+                          <div className="alert-msg">
+                            {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
+                            {a.familyMemberId ? ` · ${memberNameById.get(a.familyMemberId) ?? "Person"}` : ""}
+                          </div>
                       </td>
-                      <td className="num">
+                      <td className="num action-cell">
+                        <div className="action-stack">
                         <button className="btn ghost small icon-only" aria-label="Termin wieder öffnen" title="Termin wieder öffnen" onClick={() => reopenAppointment(a)}>
                           <i className="fa-solid fa-rotate-left" aria-hidden />
                           <span className="sr-only">Wieder öffnen</span>
@@ -361,6 +637,7 @@ export default function Family() {
                           <i className="fa-solid fa-trash" aria-hidden />
                           <span className="sr-only">Löschen</span>
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -369,20 +646,6 @@ export default function Family() {
             </div>
           )}
         </Section>
-
-        <Section title="Organisation fuer Erwachsene">
-          <div className="card">
-            <strong>Sinnvolle Nutzung im Alltag</strong>
-            <p className="alert-msg" style={{ marginTop: 10 }}>
-              Nutze Termine fuer Arzt, Behoerden, Versicherungen und Fristen. Lege wiederkehrende wichtige Daten
-              fuer Ausweise, Fuehrerschein, Aufenthaltsdokumente oder jaehrliche Steuertermine an.
-            </p>
-            <p className="alert-msg">
-              Bei Personen kannst du Rollen wie ich, Partner:in oder sonstige pflegen und damit Dokumente,
-              Termine und Fristen besser zuordnen.
-            </p>
-          </div>
-        </Section>
       </div>
 
       <Section title="Wichtige Daten" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
@@ -390,7 +653,7 @@ export default function Family() {
           ? <Empty title="Noch keine wichtigen Daten." hint="Geburtstage und Jahrestage erinnern dich rechtzeitig." />
           : <div className="card">
               <table>
-                <thead><tr><th>Anlass</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num">Aktion</th></tr></thead>
+                <thead><tr><th>Anlass</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
                 <tbody>
                   {(dates.data ?? []).map((d) => (
                     <tr key={d.id}>
@@ -398,7 +661,8 @@ export default function Family() {
                       <td>{shortDate(d.dateValue)}</td>
                       <td>{d.repeatsYearly ? "jährlich" : "einmalig"}</td>
                       <td className="num">{countdown(daysUntil(d.dateValue))}</td>
-                      <td className="num">
+                      <td className="num action-cell">
+                        <div className="action-stack">
                         <button className="btn ghost small icon-only" aria-label="Datum bearbeiten" title="Datum bearbeiten" onClick={() => editDate(d)}>
                           <i className="fa-solid fa-pen-to-square" aria-hidden />
                           <span className="sr-only">Bearbeiten</span>
@@ -407,6 +671,7 @@ export default function Family() {
                           <i className="fa-solid fa-trash" aria-hidden />
                           <span className="sr-only">Löschen</span>
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

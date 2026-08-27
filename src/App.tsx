@@ -7,7 +7,6 @@ import Dashboard from "./pages/Dashboard";
 import Documents from "./pages/Documents";
 import Family from "./pages/Family";
 import Finance from "./pages/Finance";
-import HomeItems from "./pages/HomeItems";
 import Login from "./pages/Login";
 import Tasks from "./pages/Tasks";
 import Travel from "./pages/Travel";
@@ -32,7 +31,6 @@ export default function App() {
           <Route path="authorities" element={<Authorities />} />
           <Route path="authorities/:id" element={<Authorities />} />
           <Route path="finance" element={<Finance />} />
-          <Route path="home-items" element={<HomeItems />} />
           <Route path="travel" element={<Travel />} />
           <Route path="travel/:id" element={<Travel />} />
           <Route path="documents" element={<Documents />} />
