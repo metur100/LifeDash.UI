@@ -1,4 +1,3 @@
-import type { FormEvent } from "react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -13,7 +12,6 @@ export default function Travel() {
   const trips = useAsync<Trip[]>(() => api.get("/api/trips"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
-  const [newItem, setNewItem] = useState("");
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
 
   const list = trips.data ?? [];
@@ -72,12 +70,31 @@ export default function Travel() {
     } catch (e) { setError((e as Error).message); }
   }
 
-  async function addItem(e: FormEvent, t: Trip) {
-    e.preventDefault();
-    if (!newItem.trim()) return;
+  async function addItem(t: Trip) {
+    const values = await dialog.form({
+      title: "Packlisten-Eintrag anlegen",
+      submitText: "Anlegen",
+      fields: [
+        { key: "name", label: "Eintrag" },
+        { key: "quantity", label: "Anzahl", type: "number" },
+        { key: "category", label: "Kategorie" },
+      ],
+      initial: {
+        name: "",
+        quantity: "1",
+        category: "",
+      },
+    });
+    if (!values) return;
+    if (!String(values.name).trim()) return;
+
     try {
-      await api.post(`/api/trips/${t.id}/packing`, { name: newItem, quantity: 1, isPacked: false });
-      setNewItem("");
+      await api.post(`/api/trips/${t.id}/packing`, {
+        name: String(values.name).trim(),
+        quantity: Number(values.quantity || 1),
+        category: String(values.category).trim() || null,
+        isPacked: false,
+      });
       trips.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -356,6 +373,13 @@ export default function Travel() {
 
         <Section title="Packliste">
           <div className="card">
+            <div className="row" style={{ marginBottom: 10 }}>
+              <div className="spacer" />
+              <button className="btn ghost small icon-only" aria-label="Packlisten-Eintrag anlegen" title="Packlisten-Eintrag anlegen" onClick={() => addItem(trip)}>
+                <i className="fa-solid fa-plus" aria-hidden />
+                <span className="sr-only">Packlisten-Eintrag anlegen</span>
+              </button>
+            </div>
             <ul className="checklist">
               {trip.packingItems.map((p) => (
                 <li key={p.id} className={p.isPacked ? "" : "missing"}>
@@ -377,15 +401,6 @@ export default function Travel() {
                 </li>
               ))}
             </ul>
-
-            <form className="row" style={{ marginTop: 12 }} onSubmit={(e) => addItem(e, trip)}>
-              <input value={newItem} placeholder="Was noch einpacken?" style={{ flex: 1 }}
-                     onChange={(e) => setNewItem(e.target.value)} />
-              <button className="btn icon-only" aria-label="Packlisten-Eintrag hinzufügen" title="Packlisten-Eintrag hinzufügen">
-                <i className="fa-solid fa-plus" aria-hidden />
-                <span className="sr-only">Hinzufügen</span>
-              </button>
-            </form>
           </div>
         </Section>
       </div>

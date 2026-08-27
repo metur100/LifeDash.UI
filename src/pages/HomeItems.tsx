@@ -1,4 +1,3 @@
-import type { FormEvent } from "react";
 import { useState } from "react";
 import { api } from "../api/client";
 import type { HomeItem } from "../api/types";
@@ -11,21 +10,45 @@ export default function HomeItems() {
   const items = useAsync<HomeItem[]>(() => api.get("/api/home-items"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ kind: "repair", title: "", room: "", warrantyUntil: "" });
 
-  async function add(e: FormEvent) {
-    e.preventDefault();
-    if (!draft.title.trim()) return;
+  async function addItem() {
+    const values = await dialog.form({
+      title: "Eintrag anlegen",
+      submitText: "Anlegen",
+      fields: [
+        {
+          key: "kind",
+          label: "Art",
+          type: "select",
+          options: [
+            { value: "repair", label: "Reparatur" },
+            { value: "purchase", label: "Anschaffung" },
+            { value: "warranty", label: "Garantie" },
+          ],
+        },
+        { key: "title", label: "Bezeichnung" },
+        { key: "room", label: "Raum" },
+        { key: "warrantyUntil", label: "Garantie bis", type: "date" },
+      ],
+      initial: {
+        kind: "repair",
+        title: "",
+        room: "",
+        warrantyUntil: "",
+      },
+    });
+    if (!values) return;
+    if (!String(values.title).trim()) return;
+
     try {
       await api.post("/api/home-items", {
-        kind: draft.kind,
-        title: draft.title,
-        room: draft.room || null,
-        warrantyUntil: draft.warrantyUntil || null,
+        kind: String(values.kind),
+        title: String(values.title).trim(),
+        room: String(values.room).trim() || null,
+        warrantyUntil: String(values.warrantyUntil).trim() || null,
         currency: "EUR",
         status: "open",
       });
-      setDraft({ kind: "repair", title: "", room: "", warrantyUntil: "" });
       items.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -46,7 +69,7 @@ export default function HomeItems() {
 
   async function editItem(item: HomeItem) {
     const values = await dialog.form({
-      title: "Haushalts-Eintrag bearbeiten",
+      title: "Zuhause-Eintrag bearbeiten",
       fields: [
         { key: "title", label: "Bezeichnung" },
         {
@@ -118,11 +141,11 @@ export default function HomeItems() {
 
   return (
     <>
-      <PageHead eyebrow="Haushalt" title="Reparaturen, Anschaffungen, Garantien"
+      <PageHead eyebrow="Zuhause" title="Reparaturen, Anschaffungen, Garantien"
         lede="Was kaputt ist, was gekauft wurde und wie lange die Garantie noch läuft." />
       <ErrorBar message={error ?? items.error} />
 
-      <Section title="Offene Reparaturen">
+      <Section title="Offene Reparaturen" action={<button className="btn icon-only" aria-label="Eintrag hinzufügen" title="Eintrag hinzufügen" onClick={addItem}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Eintrag hinzufügen</span></button>}>
         <div className="card">
           {repairs.length === 0
             ? <Empty title="Nichts kaputt." hint="Trage eine Reparatur ein, damit sie nicht vergessen wird." />
@@ -153,30 +176,6 @@ export default function HomeItems() {
                 </tbody>
               </table>}
 
-          <form className="form-grid" style={{ marginTop: 16 }} onSubmit={add}>
-            <label className="field">Art
-              <select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value })}>
-                <option value="repair">Reparatur</option>
-                <option value="purchase">Anschaffung</option>
-                <option value="warranty">Garantie</option>
-              </select>
-            </label>
-            <label className="field">Bezeichnung
-              <input value={draft.title} required onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-            </label>
-            <label className="field">Raum
-              <input value={draft.room} onChange={(e) => setDraft({ ...draft, room: e.target.value })} />
-            </label>
-            <label className="field">Garantie bis
-              <input type="date" value={draft.warrantyUntil} onChange={(e) => setDraft({ ...draft, warrantyUntil: e.target.value })} />
-            </label>
-            <label className="field">&nbsp;
-              <button className="btn icon-only" aria-label="Eintrag hinzufügen" title="Eintrag hinzufügen">
-                <i className="fa-solid fa-plus" aria-hidden />
-                <span className="sr-only">Eintragen</span>
-              </button>
-            </label>
-          </form>
         </div>
       </Section>
 

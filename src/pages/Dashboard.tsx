@@ -15,7 +15,7 @@ const filters = [
   { id: "authority", label: "Behörden" },
   { id: "finance", label: "Finanzen" },
   { id: "family", label: "Familie" },
-  { id: "home", label: "Haushalt" },
+  { id: "home", label: "Zuhause" },
   { id: "travel", label: "Reisen" },
 ];
 
@@ -48,7 +48,7 @@ export default function Dashboard({ onCount }: { onCount?: (n: number) => void }
       <PageHead
         eyebrow="Übersicht"
         title="Was als Nächstes ansteht"
-        lede="Alle Fristen aus Familie, Behörden, Finanzen, Haushalt und Reisen an einem Ort — nach Dringlichkeit sortiert."
+        lede="Alle Fristen aus Familie, Behörden, Finanzen, Zuhause und Reisen an einem Ort — nach Dringlichkeit sortiert."
       />
 
       <Horizon alerts={data.alerts} horizon={120} />

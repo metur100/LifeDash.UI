@@ -1,4 +1,3 @@
-import type { FormEvent } from "react";
 import { useState } from "react";
 import { api } from "../api/client";
 import type { TaskItem } from "../api/types";
@@ -10,7 +9,7 @@ import { useAsync } from "../lib/useAsync";
 const modules = ["general", "family", "authority", "finance", "home", "travel"];
 const moduleLabels: Record<string, string> = {
   general: "Allgemein", family: "Familie", authority: "Behörden",
-  finance: "Finanzen", home: "Haushalt", travel: "Reisen",
+  finance: "Finanzen", home: "Zuhause", travel: "Reisen",
 };
 
 export default function Tasks() {
@@ -18,14 +17,45 @@ export default function Tasks() {
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
-  const [draft, setDraft] = useState({ title: "", module: "general", dueOn: "", priority: "normal" });
 
-  async function add(e: FormEvent) {
-    e.preventDefault();
-    if (!draft.title.trim()) return;
+  async function addTask() {
+    const values = await dialog.form({
+      title: "Aufgabe anlegen",
+      fields: [
+        { key: "title", label: "Aufgabe" },
+        { key: "module", label: "Bereich", type: "select", options: modules.map((m) => ({ value: m, label: moduleLabels[m] })) },
+        { key: "dueOn", label: "Fällig am", type: "date" },
+        {
+          key: "priority",
+          label: "Priorität",
+          type: "select",
+          options: [
+            { value: "low", label: "niedrig" },
+            { value: "normal", label: "normal" },
+            { value: "high", label: "hoch" },
+          ],
+        },
+      ],
+      initial: {
+        title: "",
+        module: "general",
+        dueOn: "",
+        priority: "normal",
+      },
+      submitText: "Anlegen",
+    });
+    if (!values) return;
+    const title = String(values.title).trim();
+    if (!title) return;
+
     try {
-      await api.post("/api/tasks", { ...draft, dueOn: draft.dueOn || null, isDone: false });
-      setDraft({ title: "", module: "general", dueOn: "", priority: "normal" });
+      await api.post("/api/tasks", {
+        title,
+        module: String(values.module),
+        dueOn: String(values.dueOn).trim() || null,
+        priority: String(values.priority),
+        isDone: false,
+      });
       tasks.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -90,15 +120,21 @@ export default function Tasks() {
     <>
       <PageHead eyebrow="Aufgaben" title="Was du selbst erledigen musst"
         lede="Kleine Schritte, die zwischen den großen Fristen hängen bleiben."
-        action={<button className="btn ghost icon-only" aria-label={showDone ? "Erledigte ausblenden" : "Erledigte anzeigen"} title={showDone ? "Erledigte ausblenden" : "Erledigte anzeigen"} onClick={() => setShowDone(!showDone)}>
-          <i className={`fa-solid ${showDone ? "fa-eye-slash" : "fa-eye"}`} aria-hidden />
-          <span className="sr-only">{showDone ? "Erledigte ausblenden" : "Erledigte anzeigen"}</span>
-        </button>} />
+        action={<>
+          <button className="btn icon-only" aria-label="Aufgabe anlegen" title="Aufgabe anlegen" onClick={addTask}>
+            <i className="fa-solid fa-plus" aria-hidden />
+            <span className="sr-only">Aufgabe anlegen</span>
+          </button>{" "}
+          <button className="btn ghost icon-only" aria-label={showDone ? "Erledigte ausblenden" : "Erledigte anzeigen"} title={showDone ? "Erledigte ausblenden" : "Erledigte anzeigen"} onClick={() => setShowDone(!showDone)}>
+            <i className={`fa-solid ${showDone ? "fa-eye-slash" : "fa-eye"}`} aria-hidden />
+            <span className="sr-only">{showDone ? "Erledigte ausblenden" : "Erledigte anzeigen"}</span>
+          </button>
+        </>} />
       <ErrorBar message={error ?? tasks.error} />
 
       <div className="card">
         {list.length === 0
-          ? <Empty title="Nichts offen." hint="Lege unten eine Aufgabe an." />
+          ? <Empty title="Nichts offen." hint="Lege eine Aufgabe über das Plus an." />
           : <ul className="checklist">
               {list.map((t) => {
                 const d = daysUntil(t.dueOn);
@@ -126,32 +162,6 @@ export default function Tasks() {
               })}
             </ul>}
 
-        <form className="form-grid" style={{ marginTop: 18 }} onSubmit={add}>
-          <label className="field">Aufgabe
-            <input value={draft.title} required onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-          </label>
-          <label className="field">Bereich
-            <select value={draft.module} onChange={(e) => setDraft({ ...draft, module: e.target.value })}>
-              {modules.map((m) => <option key={m} value={m}>{moduleLabels[m]}</option>)}
-            </select>
-          </label>
-          <label className="field">Fällig am
-            <input type="date" value={draft.dueOn} onChange={(e) => setDraft({ ...draft, dueOn: e.target.value })} />
-          </label>
-          <label className="field">Priorität
-            <select value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value })}>
-              <option value="low">niedrig</option>
-              <option value="normal">normal</option>
-              <option value="high">hoch</option>
-            </select>
-          </label>
-          <label className="field">&nbsp;
-            <button className="btn icon-only" aria-label="Aufgabe anlegen" title="Aufgabe anlegen">
-              <i className="fa-solid fa-plus" aria-hidden />
-              <span className="sr-only">Aufgabe anlegen</span>
-            </button>
-          </label>
-        </form>
       </div>
     </>
   );

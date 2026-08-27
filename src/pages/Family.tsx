@@ -1,4 +1,3 @@
-import type { FormEvent } from "react";
 import { useState } from "react";
 import { api } from "../api/client";
 import type { Appointment, FamilyMember, ImportantDate } from "../api/types";
@@ -13,20 +12,42 @@ export default function Family() {
   const dates = useAsync<ImportantDate[]>(() => api.get("/api/important-dates"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
-  const [newMember, setNewMember] = useState({ fullName: "", relation: "child", birthDate: "" });
-  const [newAppointment, setNewAppointment] = useState({ title: "", startsAt: "", location: "", category: "family" });
-  const [newDate, setNewDate] = useState({ title: "", dateValue: today(), repeatsYearly: true });
 
-  async function addMember(e: FormEvent) {
-    e.preventDefault();
-    if (!newMember.fullName.trim()) return;
+  async function addMember() {
+    const values = await dialog.form({
+      title: "Person hinzufügen",
+      submitText: "Anlegen",
+      fields: [
+        { key: "fullName", label: "Name" },
+        { key: "relation", label: "Rolle", type: "select", options: [
+          { value: "self", label: "ich" },
+          { value: "spouse", label: "Partner:in" },
+          { value: "child", label: "Kind" },
+          { value: "other", label: "sonstige" },
+        ] },
+        { key: "birthDate", label: "Geburtstag", type: "date" },
+        { key: "nationality", label: "Staatsangehörigkeit" },
+        { key: "notes", label: "Notizen" },
+      ],
+      initial: {
+        fullName: "",
+        relation: "self",
+        birthDate: "",
+        nationality: "",
+        notes: "",
+      },
+    });
+    if (!values) return;
+    if (!String(values.fullName).trim()) return;
+
     try {
       await api.post("/api/family-members", {
-        fullName: newMember.fullName,
-        relation: newMember.relation,
-        birthDate: newMember.birthDate || null,
+        fullName: String(values.fullName).trim(),
+        relation: String(values.relation).trim() || null,
+        birthDate: String(values.birthDate).trim() || null,
+        nationality: String(values.nationality).trim() || null,
+        notes: String(values.notes).trim() || null,
       });
-      setNewMember({ fullName: "", relation: "child", birthDate: "" });
       members.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -59,16 +80,14 @@ export default function Family() {
         ] },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
-        { key: "schoolName", label: "Schule" },
-        { key: "schoolGrade", label: "Klasse" },
+        { key: "notes", label: "Notizen" },
       ],
       initial: {
         fullName: m.fullName,
         relation: m.relation ?? "",
         birthDate: m.birthDate ?? "",
         nationality: m.nationality ?? "",
-        schoolName: m.schoolName ?? "",
-        schoolGrade: m.schoolGrade ?? "",
+        notes: m.notes ?? "",
       },
     });
     if (!values) return;
@@ -80,8 +99,7 @@ export default function Family() {
         relation: String(values.relation).trim() || null,
         birthDate: String(values.birthDate).trim() || null,
         nationality: String(values.nationality).trim() || null,
-        schoolName: String(values.schoolName).trim() || null,
-        schoolGrade: String(values.schoolGrade).trim() || null,
+        notes: String(values.notes).trim() || null,
       });
       members.reload();
     } catch (e) { setError((e as Error).message); }
@@ -176,34 +194,72 @@ export default function Family() {
     } catch (e) { setError((e as Error).message); }
   }
 
-  async function addAppointment(e: FormEvent) {
-    e.preventDefault();
-    if (!newAppointment.title.trim() || !newAppointment.startsAt.trim()) return;
+  async function addAppointment() {
+    const values = await dialog.form({
+      title: "Termin anlegen",
+      submitText: "Anlegen",
+      fields: [
+        { key: "title", label: "Termin" },
+        { key: "startsAt", label: "Start", type: "datetime-local" },
+        { key: "location", label: "Ort" },
+        { key: "category", label: "Kategorie", type: "select", options: [
+          { value: "family", label: "family" },
+          { value: "authority", label: "authority" },
+          { value: "health", label: "health" },
+          { value: "home", label: "home" },
+        ] },
+      ],
+      initial: {
+        title: "",
+        startsAt: "",
+        location: "",
+        category: "family",
+      },
+    });
+    if (!values) return;
+    if (!String(values.title).trim() || !String(values.startsAt).trim()) return;
+
     try {
       await api.post("/api/appointments", {
-        title: newAppointment.title.trim(),
-        startsAt: new Date(newAppointment.startsAt).toISOString(),
-        location: newAppointment.location.trim() || null,
-        category: newAppointment.category,
+        title: String(values.title).trim(),
+        startsAt: new Date(String(values.startsAt)).toISOString(),
+        location: String(values.location).trim() || null,
+        category: String(values.category),
         reminderDays: 3,
         isDone: false,
       });
-      setNewAppointment({ title: "", startsAt: "", location: "", category: "family" });
       appts.reload();
     } catch (e) { setError((e as Error).message); }
   }
 
-  async function addDate(e: FormEvent) {
-    e.preventDefault();
-    if (!newDate.title.trim() || !newDate.dateValue.trim()) return;
+  async function addDate() {
+    const values = await dialog.form({
+      title: "Datum anlegen",
+      submitText: "Anlegen",
+      fields: [
+        { key: "title", label: "Anlass" },
+        { key: "dateValue", label: "Datum", type: "date" },
+        { key: "repeatsYearly", label: "Wiederholung", type: "select", options: [
+          { value: "true", label: "jährlich" },
+          { value: "false", label: "einmalig" },
+        ] },
+      ],
+      initial: {
+        title: "",
+        dateValue: today(),
+        repeatsYearly: "true",
+      },
+    });
+    if (!values) return;
+    if (!String(values.title).trim() || !String(values.dateValue).trim()) return;
+
     try {
       await api.post("/api/important-dates", {
-        title: newDate.title.trim(),
-        dateValue: newDate.dateValue,
-        repeatsYearly: newDate.repeatsYearly,
+        title: String(values.title).trim(),
+        dateValue: String(values.dateValue),
+        repeatsYearly: String(values.repeatsYearly) === "true",
         reminderDays: 14,
       });
-      setNewDate({ title: "", dateValue: today(), repeatsYearly: true });
       dates.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -215,15 +271,13 @@ export default function Family() {
     .filter((a) => a.isDone)
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
 
-  const school = (members.data ?? []).filter((m) => m.schoolName);
-
   return (
     <>
       <PageHead eyebrow="Familie" title="Wer wann was braucht"
-        lede="Personen, Schulinfos, Termine und wiederkehrende Daten für alle im Haushalt." />
+        lede="Personen, Termine und wichtige Daten fuer dein Familien- und Erwachsenenleben." />
       <ErrorBar message={error ?? members.error ?? appts.error} />
 
-      <Section title="Haushalt">
+      <Section title="Personen" action={<button className="btn icon-only" aria-label="Person hinzufügen" title="Person hinzufügen" onClick={addMember}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Person hinzufügen</span></button>}>
         <div className="card">
           <table>
             <thead><tr><th>Name</th><th>Rolle</th><th>Geburtstag</th><th>Staatsangehörigkeit</th><th className="num">Aktion</th></tr></thead>
@@ -249,36 +303,11 @@ export default function Family() {
             </tbody>
           </table>
 
-          <form className="form-grid" style={{ marginTop: 16 }} onSubmit={addMember}>
-            <label className="field">Name
-              <input value={newMember.fullName} required
-                     onChange={(e) => setNewMember({ ...newMember, fullName: e.target.value })} />
-            </label>
-            <label className="field">Rolle
-              <select value={newMember.relation}
-                      onChange={(e) => setNewMember({ ...newMember, relation: e.target.value })}>
-                <option value="self">ich</option>
-                <option value="spouse">Partner:in</option>
-                <option value="child">Kind</option>
-                <option value="other">sonstige</option>
-              </select>
-            </label>
-            <label className="field">Geburtstag
-              <input type="date" value={newMember.birthDate}
-                     onChange={(e) => setNewMember({ ...newMember, birthDate: e.target.value })} />
-            </label>
-            <label className="field">&nbsp;
-              <button className="btn icon-only" aria-label="Person hinzufügen" title="Person hinzufügen">
-                <i className="fa-solid fa-user-plus" aria-hidden />
-                <span className="sr-only">Person hinzufügen</span>
-              </button>
-            </label>
-          </form>
         </div>
       </Section>
 
       <div className="grid-2">
-        <Section title="Termine">
+        <Section title="Termine" action={<button className="btn icon-only" aria-label="Termin anlegen" title="Termin anlegen" onClick={addAppointment}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Termin anlegen</span></button>}>
           {upcoming.length === 0
             ? <Empty title="Keine offenen Termine." hint="Neue Termine erscheinen hier, sobald du sie anlegst." />
             : <div className="card">
@@ -312,36 +341,6 @@ export default function Family() {
                   </tbody>
                 </table>
               </div>}
-
-          <div className="card" style={{ marginTop: 12 }}>
-            <form className="form-grid" onSubmit={addAppointment}>
-              <label className="field">Termin
-                <input value={newAppointment.title} required onChange={(e) => setNewAppointment({ ...newAppointment, title: e.target.value })} />
-              </label>
-              <label className="field">Start
-                <input type="datetime-local" value={newAppointment.startsAt} required onChange={(e) => setNewAppointment({ ...newAppointment, startsAt: e.target.value })} />
-              </label>
-              <label className="field">Ort
-                <input value={newAppointment.location} onChange={(e) => setNewAppointment({ ...newAppointment, location: e.target.value })} />
-              </label>
-              <label className="field">Kategorie
-                <select value={newAppointment.category} onChange={(e) => setNewAppointment({ ...newAppointment, category: e.target.value })}>
-                  <option value="family">family</option>
-                  <option value="school">school</option>
-                  <option value="authority">authority</option>
-                  <option value="health">health</option>
-                  <option value="home">home</option>
-                </select>
-              </label>
-              <label className="field">&nbsp;
-                <button className="btn icon-only" aria-label="Termin anlegen" title="Termin anlegen">
-                  <i className="fa-solid fa-plus" aria-hidden />
-                  <span className="sr-only">Termin anlegen</span>
-                </button>
-              </label>
-            </form>
-          </div>
-
           {doneAppointments.length > 0 && (
             <div className="card" style={{ marginTop: 12 }}>
               <strong>Erledigte Termine</strong>
@@ -371,27 +370,22 @@ export default function Family() {
           )}
         </Section>
 
-        <Section title="Schule & Betreuung">
-          {school.length === 0
-            ? <Empty title="Keine Schulinfos hinterlegt." hint="Trage Schule und Klasse bei einer Person ein." />
-            : <div className="card">
-                <table>
-                  <thead><tr><th>Kind</th><th>Einrichtung</th><th>Klasse</th></tr></thead>
-                  <tbody>
-                    {school.map((m) => (
-                      <tr key={m.id}>
-                        <td><strong>{m.fullName}</strong></td>
-                        <td>{m.schoolName}</td>
-                        <td>{m.schoolGrade ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>}
+        <Section title="Organisation fuer Erwachsene">
+          <div className="card">
+            <strong>Sinnvolle Nutzung im Alltag</strong>
+            <p className="alert-msg" style={{ marginTop: 10 }}>
+              Nutze Termine fuer Arzt, Behoerden, Versicherungen und Fristen. Lege wiederkehrende wichtige Daten
+              fuer Ausweise, Fuehrerschein, Aufenthaltsdokumente oder jaehrliche Steuertermine an.
+            </p>
+            <p className="alert-msg">
+              Bei Personen kannst du Rollen wie ich, Partner:in oder sonstige pflegen und damit Dokumente,
+              Termine und Fristen besser zuordnen.
+            </p>
+          </div>
         </Section>
       </div>
 
-      <Section title="Wichtige Daten">
+      <Section title="Wichtige Daten" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
         {(dates.data ?? []).length === 0
           ? <Empty title="Noch keine wichtigen Daten." hint="Geburtstage und Jahrestage erinnern dich rechtzeitig." />
           : <div className="card">
@@ -419,29 +413,6 @@ export default function Family() {
                 </tbody>
               </table>
             </div>}
-
-        <div className="card" style={{ marginTop: 12 }}>
-          <form className="form-grid" onSubmit={addDate}>
-            <label className="field">Anlass
-              <input value={newDate.title} required onChange={(e) => setNewDate({ ...newDate, title: e.target.value })} />
-            </label>
-            <label className="field">Datum
-              <input type="date" value={newDate.dateValue} required onChange={(e) => setNewDate({ ...newDate, dateValue: e.target.value })} />
-            </label>
-            <label className="field">Wiederholung
-              <select value={newDate.repeatsYearly ? "true" : "false"} onChange={(e) => setNewDate({ ...newDate, repeatsYearly: e.target.value === "true" })}>
-                <option value="true">jährlich</option>
-                <option value="false">einmalig</option>
-              </select>
-            </label>
-            <label className="field">&nbsp;
-              <button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen">
-                <i className="fa-solid fa-plus" aria-hidden />
-                <span className="sr-only">Datum anlegen</span>
-              </button>
-            </label>
-          </form>
-        </div>
       </Section>
     </>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
 import { ErrorBar } from "../components/Ui";
 
@@ -67,6 +68,10 @@ export default function Login() {
           )}
           {!googleClientId && <p className="auth-hint">Google Login: setze VITE_GOOGLE_CLIENT_ID im Frontend.</p>}
           {busy && <p className="auth-hint">Anmeldung läuft …</p>}
+
+          <p className="auth-legal">
+            Mit der Nutzung stimmst du den <Link to="/terms">Nutzungsbedingungen</Link> zu und bestätigst die <Link to="/privacy">Datenschutzerklärung</Link>.
+          </p>
         </div>
       </div>
     </div>

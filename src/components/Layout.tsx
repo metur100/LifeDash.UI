@@ -7,7 +7,7 @@ const links = [
   { to: "/family", label: "Familie", icon: "fa-solid fa-people-group" },
   { to: "/authorities", label: "Behörden", icon: "fa-solid fa-building-shield" },
   { to: "/finance", label: "Finanzen", icon: "fa-solid fa-wallet" },
-  { to: "/home-items", label: "Haushalt", icon: "fa-solid fa-house" },
+  { to: "/home-items", label: "Zuhause", icon: "fa-solid fa-house" },
   { to: "/travel", label: "Reisen", icon: "fa-solid fa-plane-departure" },
   { to: "/documents", label: "Dokumente", icon: "fa-solid fa-folder-open" },
   { to: "/tasks", label: "Aufgaben", icon: "fa-solid fa-list-check" },
@@ -65,6 +65,17 @@ export default function Layout({ alertCount }: { alertCount: number }) {
                 )}
               </NavLink>
             ))}
+          </nav>
+          <p className="rail-group-label" style={{ marginTop: 14 }}>Rechtliches</p>
+          <nav className="nav">
+            <NavLink to="/privacy" onClick={() => setMobileOpen(false)}>
+              <span className="nav-icon" aria-hidden><i className="fa-solid fa-shield-halved" /></span>
+              Datenschutz
+            </NavLink>
+            <NavLink to="/terms" onClick={() => setMobileOpen(false)}>
+              <span className="nav-icon" aria-hidden><i className="fa-solid fa-file-contract" /></span>
+              Nutzungsbedingungen
+            </NavLink>
           </nav>
           </div>
 
