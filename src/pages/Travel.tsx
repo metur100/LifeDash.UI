@@ -14,9 +14,14 @@ export default function Travel() {
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
   const [newItem, setNewItem] = useState("");
+  const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
 
   const list = trips.data ?? [];
-  const trip = id ? list.find((t) => t.id === Number(id)) : list.find((t) => daysUntil(t.startsOn)! >= 0) ?? list[0];
+  const trip = id
+    ? list.find((t) => t.id === Number(id))
+    : (selectedTripId ? list.find((t) => t.id === selectedTripId) : undefined)
+      ?? list.find((t) => daysUntil(t.startsOn)! >= 0)
+      ?? list[0];
 
   async function createTrip() {
     const values = await dialog.form({
@@ -180,6 +185,50 @@ export default function Travel() {
     } catch (e) { setError((e as Error).message); }
   }
 
+  async function addBooking(t: Trip) {
+    const values = await dialog.form({
+      title: "Buchung anlegen",
+      submitText: "Anlegen",
+      fields: [
+        { key: "title", label: "Buchungstitel" },
+        {
+          key: "kind",
+          label: "Art",
+          type: "select",
+          options: [
+            { value: "flight", label: "flight" },
+            { value: "hotel", label: "hotel" },
+            { value: "train", label: "train" },
+            { value: "car", label: "car" },
+            { value: "activity", label: "activity" },
+          ],
+        },
+        { key: "startsAt", label: "Start", type: "datetime-local" },
+        { key: "amount", label: "Betrag", type: "number" },
+      ],
+      initial: {
+        title: "",
+        kind: "flight",
+        startsAt: "",
+        amount: "",
+      },
+    });
+    if (!values) return;
+
+    const title = String(values.title).trim();
+    if (!title) return;
+    try {
+      await api.post(`/api/trips/${t.id}/bookings`, {
+        title,
+        kind: String(values.kind),
+        startsAt: String(values.startsAt).trim() ? new Date(String(values.startsAt)).toISOString() : null,
+        amount: String(values.amount).trim() ? Number(values.amount) : null,
+        currency: "EUR",
+      });
+      trips.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
   async function editPacking(t: Trip, p: PackingItem) {
     const values = await dialog.form({
       title: "Packlisten-Eintrag bearbeiten",
@@ -266,6 +315,13 @@ export default function Travel() {
       <div className="grid-2">
         <Section title="Buchungen">
           <div className="card">
+            <div className="row" style={{ marginBottom: 10 }}>
+              <div className="spacer" />
+              <button className="btn ghost small icon-only" aria-label="Buchung anlegen" title="Buchung anlegen" onClick={() => addBooking(trip)}>
+                <i className="fa-solid fa-plus" aria-hidden />
+                <span className="sr-only">Buchung anlegen</span>
+              </button>
+            </div>
             {trip.bookings.length === 0
               ? <Empty title="Noch nichts gebucht." hint="Flüge, Hotels und Mietwagen landen hier." />
               : <table>
@@ -344,6 +400,20 @@ export default function Travel() {
                     <td><strong>{t.title}</strong><div className="alert-msg">{t.destination}</div></td>
                     <td>{shortDate(t.startsOn)}</td>
                     <td className="num"><span className="badge">{t.status}</span></td>
+                    <td className="num">
+                      <button className="btn ghost small icon-only" aria-label="Reise öffnen" title="Reise öffnen" onClick={() => setSelectedTripId(t.id)}>
+                        <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden />
+                        <span className="sr-only">Öffnen</span>
+                      </button>{" "}
+                      <button className="btn ghost small icon-only" aria-label="Reise bearbeiten" title="Reise bearbeiten" onClick={() => editTrip(t)}>
+                        <i className="fa-solid fa-pen-to-square" aria-hidden />
+                        <span className="sr-only">Bearbeiten</span>
+                      </button>{" "}
+                      <button className="btn danger small icon-only" aria-label="Reise löschen" title="Reise löschen" onClick={() => removeTrip(t.id)}>
+                        <i className="fa-solid fa-trash" aria-hidden />
+                        <span className="sr-only">Löschen</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

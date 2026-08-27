@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { Appointment, FamilyMember, ImportantDate } from "../api/types";
 import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
-import { countdown, dateTime, daysUntil, shortDate } from "../lib/format";
+import { countdown, dateTime, daysUntil, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
 export default function Family() {
@@ -14,6 +14,8 @@ export default function Family() {
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
   const [newMember, setNewMember] = useState({ fullName: "", relation: "child", birthDate: "" });
+  const [newAppointment, setNewAppointment] = useState({ title: "", startsAt: "", location: "", category: "family" });
+  const [newDate, setNewDate] = useState({ title: "", dateValue: today(), repeatsYearly: true });
 
   async function addMember(e: FormEvent) {
     e.preventDefault();
@@ -32,6 +34,13 @@ export default function Family() {
   async function completeAppointment(a: Appointment) {
     try {
       await api.put(`/api/appointments/${a.id}`, { ...a, isDone: true });
+      appts.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function reopenAppointment(a: Appointment) {
+    try {
+      await api.put(`/api/appointments/${a.id}`, { ...a, isDone: false });
       appts.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -167,9 +176,44 @@ export default function Family() {
     } catch (e) { setError((e as Error).message); }
   }
 
+  async function addAppointment(e: FormEvent) {
+    e.preventDefault();
+    if (!newAppointment.title.trim() || !newAppointment.startsAt.trim()) return;
+    try {
+      await api.post("/api/appointments", {
+        title: newAppointment.title.trim(),
+        startsAt: new Date(newAppointment.startsAt).toISOString(),
+        location: newAppointment.location.trim() || null,
+        category: newAppointment.category,
+        reminderDays: 3,
+        isDone: false,
+      });
+      setNewAppointment({ title: "", startsAt: "", location: "", category: "family" });
+      appts.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function addDate(e: FormEvent) {
+    e.preventDefault();
+    if (!newDate.title.trim() || !newDate.dateValue.trim()) return;
+    try {
+      await api.post("/api/important-dates", {
+        title: newDate.title.trim(),
+        dateValue: newDate.dateValue,
+        repeatsYearly: newDate.repeatsYearly,
+        reminderDays: 14,
+      });
+      setNewDate({ title: "", dateValue: today(), repeatsYearly: true });
+      dates.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
   const upcoming = (appts.data ?? [])
     .filter((a) => !a.isDone)
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const doneAppointments = (appts.data ?? [])
+    .filter((a) => a.isDone)
+    .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
 
   const school = (members.data ?? []).filter((m) => m.schoolName);
 
@@ -268,6 +312,63 @@ export default function Family() {
                   </tbody>
                 </table>
               </div>}
+
+          <div className="card" style={{ marginTop: 12 }}>
+            <form className="form-grid" onSubmit={addAppointment}>
+              <label className="field">Termin
+                <input value={newAppointment.title} required onChange={(e) => setNewAppointment({ ...newAppointment, title: e.target.value })} />
+              </label>
+              <label className="field">Start
+                <input type="datetime-local" value={newAppointment.startsAt} required onChange={(e) => setNewAppointment({ ...newAppointment, startsAt: e.target.value })} />
+              </label>
+              <label className="field">Ort
+                <input value={newAppointment.location} onChange={(e) => setNewAppointment({ ...newAppointment, location: e.target.value })} />
+              </label>
+              <label className="field">Kategorie
+                <select value={newAppointment.category} onChange={(e) => setNewAppointment({ ...newAppointment, category: e.target.value })}>
+                  <option value="family">family</option>
+                  <option value="school">school</option>
+                  <option value="authority">authority</option>
+                  <option value="health">health</option>
+                  <option value="home">home</option>
+                </select>
+              </label>
+              <label className="field">&nbsp;
+                <button className="btn icon-only" aria-label="Termin anlegen" title="Termin anlegen">
+                  <i className="fa-solid fa-plus" aria-hidden />
+                  <span className="sr-only">Termin anlegen</span>
+                </button>
+              </label>
+            </form>
+          </div>
+
+          {doneAppointments.length > 0 && (
+            <div className="card" style={{ marginTop: 12 }}>
+              <strong>Erledigte Termine</strong>
+              <table style={{ marginTop: 8 }}>
+                <tbody>
+                  {doneAppointments.map((a) => (
+                    <tr key={a.id}>
+                      <td>
+                        <strong>{a.title}</strong>
+                        <div className="alert-msg">{dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}</div>
+                      </td>
+                      <td className="num">
+                        <button className="btn ghost small icon-only" aria-label="Termin wieder öffnen" title="Termin wieder öffnen" onClick={() => reopenAppointment(a)}>
+                          <i className="fa-solid fa-rotate-left" aria-hidden />
+                          <span className="sr-only">Wieder öffnen</span>
+                        </button>{" "}
+                        <button className="btn danger small icon-only" aria-label="Termin löschen" title="Termin löschen" onClick={() => removeAppointment(a.id)}>
+                          <i className="fa-solid fa-trash" aria-hidden />
+                          <span className="sr-only">Löschen</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Section>
 
         <Section title="Schule & Betreuung">
@@ -318,6 +419,29 @@ export default function Family() {
                 </tbody>
               </table>
             </div>}
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <form className="form-grid" onSubmit={addDate}>
+            <label className="field">Anlass
+              <input value={newDate.title} required onChange={(e) => setNewDate({ ...newDate, title: e.target.value })} />
+            </label>
+            <label className="field">Datum
+              <input type="date" value={newDate.dateValue} required onChange={(e) => setNewDate({ ...newDate, dateValue: e.target.value })} />
+            </label>
+            <label className="field">Wiederholung
+              <select value={newDate.repeatsYearly ? "true" : "false"} onChange={(e) => setNewDate({ ...newDate, repeatsYearly: e.target.value === "true" })}>
+                <option value="true">jährlich</option>
+                <option value="false">einmalig</option>
+              </select>
+            </label>
+            <label className="field">&nbsp;
+              <button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen">
+                <i className="fa-solid fa-plus" aria-hidden />
+                <span className="sr-only">Datum anlegen</span>
+              </button>
+            </label>
+          </form>
+        </div>
       </Section>
     </>
   );

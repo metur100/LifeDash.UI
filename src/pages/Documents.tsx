@@ -19,7 +19,7 @@ export default function Documents() {
   const [error, setError] = useState<string | null>(null);
   const [driveInfo, setDriveInfo] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
-  const [draft, setDraft] = useState({ title: "", category: "authority", documentType: "", expiresOn: "" });
+  const [draft, setDraft] = useState({ title: "", category: "authority", documentType: "", expiresOn: "", reminderDays: "30" });
   const [driveBusy, setDriveBusy] = useState(false);
   const fileFor = useRef<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -213,9 +213,9 @@ export default function Documents() {
         documentType: draft.documentType || null,
         issuedOn: today(),
         expiresOn: draft.expiresOn || null,
-        reminderDays: 30,
+        reminderDays: Number(draft.reminderDays || 30),
       });
-      setDraft({ title: "", category: "authority", documentType: "", expiresOn: "" });
+      setDraft({ title: "", category: "authority", documentType: "", expiresOn: "", reminderDays: "30" });
       docs.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -251,12 +251,14 @@ export default function Documents() {
         { key: "category", label: "Kategorie", type: "select", options: categories.map((c) => ({ value: c, label: categoryLabels[c] })) },
         { key: "documentType", label: "Art" },
         { key: "expiresOn", label: "Läuft ab am", type: "date" },
+        { key: "reminderDays", label: "Erinnerung (Tage vorher)", type: "number" },
       ],
       initial: {
         title: d.title,
         category: d.category,
         documentType: d.documentType ?? "",
         expiresOn: d.expiresOn ?? "",
+        reminderDays: String(d.reminderDays),
       },
     });
     if (!values) return;
@@ -268,6 +270,7 @@ export default function Documents() {
         category: String(values.category),
         documentType: String(values.documentType).trim() || null,
         expiresOn: String(values.expiresOn).trim() || null,
+        reminderDays: Number(values.reminderDays || d.reminderDays),
       });
       docs.reload();
     } catch (e) { setError((e as Error).message); }
@@ -378,6 +381,10 @@ export default function Documents() {
           <label className="field">Läuft ab am
             <input type="date" value={draft.expiresOn}
                    onChange={(e) => setDraft({ ...draft, expiresOn: e.target.value })} />
+          </label>
+          <label className="field">Erinnerung (Tage vorher)
+            <input type="number" min="1" value={draft.reminderDays}
+                   onChange={(e) => setDraft({ ...draft, reminderDays: e.target.value })} />
           </label>
           <label className="field">&nbsp;
             <button className="btn icon-only" aria-label="Dokument anlegen" title="Dokument anlegen">

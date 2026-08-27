@@ -18,6 +18,9 @@ export default function Finance() {
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
   const [newPayment, setNewPayment] = useState({ title: "", amount: "", dueOn: today() });
+  const [newIncome, setNewIncome] = useState({ source: "", amount: "", cadence: "monthly" });
+  const [newCost, setNewCost] = useState({ name: "", amount: "", cadence: "monthly", category: "" });
+  const [newSub, setNewSub] = useState({ name: "", amount: "", cadence: "monthly", renewsOn: today(), cancelByOn: "" });
 
   const totals = useMemo(() => {
     const inc = (incomes.data ?? []).filter((i) => i.isActive)
@@ -32,6 +35,13 @@ export default function Finance() {
   async function markPaid(p: Payment) {
     try {
       await api.put(`/api/payments/${p.id}`, { ...p, isPaid: true, paidOn: today() });
+      payments.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function markUnpaid(p: Payment) {
+    try {
+      await api.put(`/api/payments/${p.id}`, { ...p, isPaid: false, paidOn: null });
       payments.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -195,6 +205,27 @@ export default function Finance() {
     } catch (e) { setError((e as Error).message); }
   }
 
+  async function toggleIncome(i: Income) {
+    try {
+      await api.put(`/api/incomes/${i.id}`, { ...i, isActive: !i.isActive });
+      incomes.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function toggleCost(c: FixedCost) {
+    try {
+      await api.put(`/api/fixed-costs/${c.id}`, { ...c, isActive: !c.isActive });
+      costs.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function toggleSubscription(s: Subscription) {
+    try {
+      await api.put(`/api/subscriptions/${s.id}`, { ...s, isActive: !s.isActive });
+      subs.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
   async function addPayment(e: FormEvent) {
     e.preventDefault();
     if (!newPayment.title.trim() || !newPayment.amount) return;
@@ -211,8 +242,61 @@ export default function Finance() {
     } catch (e) { setError((e as Error).message); }
   }
 
+  async function addIncome(e: FormEvent) {
+    e.preventDefault();
+    if (!newIncome.source.trim() || !newIncome.amount) return;
+    try {
+      await api.post("/api/incomes", {
+        source: newIncome.source.trim(),
+        amount: Number(newIncome.amount),
+        cadence: newIncome.cadence,
+        currency: "EUR",
+        isActive: true,
+      });
+      setNewIncome({ source: "", amount: "", cadence: "monthly" });
+      incomes.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function addCost(e: FormEvent) {
+    e.preventDefault();
+    if (!newCost.name.trim() || !newCost.amount) return;
+    try {
+      await api.post("/api/fixed-costs", {
+        name: newCost.name.trim(),
+        amount: Number(newCost.amount),
+        cadence: newCost.cadence,
+        category: newCost.category.trim() || null,
+        currency: "EUR",
+        isActive: true,
+      });
+      setNewCost({ name: "", amount: "", cadence: "monthly", category: "" });
+      costs.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function addSubscription(e: FormEvent) {
+    e.preventDefault();
+    if (!newSub.name.trim() || !newSub.amount || !newSub.renewsOn) return;
+    try {
+      await api.post("/api/subscriptions", {
+        name: newSub.name.trim(),
+        amount: Number(newSub.amount),
+        cadence: newSub.cadence,
+        renewsOn: newSub.renewsOn,
+        cancelByOn: newSub.cancelByOn.trim() || null,
+        currency: "EUR",
+        isActive: true,
+      });
+      setNewSub({ name: "", amount: "", cadence: "monthly", renewsOn: today(), cancelByOn: "" });
+      subs.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
   const open = (payments.data ?? []).filter((p) => !p.isPaid)
     .sort((a, b) => a.dueOn.localeCompare(b.dueOn));
+  const paid = (payments.data ?? []).filter((p) => p.isPaid)
+    .sort((a, b) => (b.paidOn ?? b.dueOn).localeCompare(a.paidOn ?? a.dueOn));
 
   return (
     <>
@@ -315,6 +399,10 @@ export default function Finance() {
                     </td>
                     <td className="num">{euro(s.amount, s.currency)}</td>
                     <td className="num">
+                      <button className="btn ghost small icon-only" aria-label={s.isActive ? "Abo pausieren" : "Abo aktivieren"} title={s.isActive ? "Abo pausieren" : "Abo aktivieren"} onClick={() => toggleSubscription(s)}>
+                        <i className={`fa-solid ${s.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
+                        <span className="sr-only">Status</span>
+                      </button>{" "}
                       <button className="btn ghost small icon-only" aria-label="Abo bearbeiten" title="Abo bearbeiten" onClick={() => editSubscription(s)}>
                         <i className="fa-solid fa-pen-to-square" aria-hidden />
                         <span className="sr-only">Bearbeiten</span>
@@ -329,6 +417,68 @@ export default function Finance() {
               })}
             </tbody>
           </table>
+
+          <form className="form-grid" style={{ marginTop: 16 }} onSubmit={addSubscription}>
+            <label className="field">Abo
+              <input value={newSub.name} required onChange={(e) => setNewSub({ ...newSub, name: e.target.value })} />
+            </label>
+            <label className="field">Betrag
+              <input type="number" step="0.01" value={newSub.amount} required onChange={(e) => setNewSub({ ...newSub, amount: e.target.value })} />
+            </label>
+            <label className="field">Turnus
+              <select value={newSub.cadence} onChange={(e) => setNewSub({ ...newSub, cadence: e.target.value })}>
+                <option value="monthly">monthly</option>
+                <option value="quarterly">quarterly</option>
+                <option value="yearly">yearly</option>
+              </select>
+            </label>
+            <label className="field">Verlängert am
+              <input type="date" value={newSub.renewsOn} required onChange={(e) => setNewSub({ ...newSub, renewsOn: e.target.value })} />
+            </label>
+            <label className="field">Kündigen bis
+              <input type="date" value={newSub.cancelByOn} onChange={(e) => setNewSub({ ...newSub, cancelByOn: e.target.value })} />
+            </label>
+            <label className="field">&nbsp;
+              <button className="btn icon-only" aria-label="Abo anlegen" title="Abo anlegen">
+                <i className="fa-solid fa-plus" aria-hidden />
+                <span className="sr-only">Abo anlegen</span>
+              </button>
+            </label>
+          </form>
+        </div>
+      </Section>
+
+      <Section title="Zahlungshistorie">
+        <div className="card">
+          {paid.length === 0
+            ? <Empty title="Noch keine bezahlten Zahlungen." hint="Sobald du eine Zahlung als bezahlt markierst, erscheint sie hier." />
+            : <table>
+                <thead><tr><th>Zahlung</th><th>Fällig</th><th>Bezahlt am</th><th className="num">Betrag</th><th className="num">Aktion</th></tr></thead>
+                <tbody>
+                  {paid.map((p) => (
+                    <tr key={p.id}>
+                      <td><strong>{p.title}</strong></td>
+                      <td>{shortDate(p.dueOn)}</td>
+                      <td>{shortDate(p.paidOn)}</td>
+                      <td className="num">{euro(p.amount, p.currency)}</td>
+                      <td className="num">
+                        <button className="btn ghost small icon-only" aria-label="Als offen markieren" title="Als offen markieren" onClick={() => markUnpaid(p)}>
+                          <i className="fa-solid fa-rotate-left" aria-hidden />
+                          <span className="sr-only">Offen</span>
+                        </button>{" "}
+                        <button className="btn ghost small icon-only" aria-label="Zahlung bearbeiten" title="Zahlung bearbeiten" onClick={() => editPayment(p)}>
+                          <i className="fa-solid fa-pen-to-square" aria-hidden />
+                          <span className="sr-only">Bearbeiten</span>
+                        </button>{" "}
+                        <button className="btn danger small icon-only" aria-label="Zahlung löschen" title="Zahlung löschen" onClick={() => removePayment(p.id)}>
+                          <i className="fa-solid fa-trash" aria-hidden />
+                          <span className="sr-only">Löschen</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>}
         </div>
       </Section>
 
@@ -340,9 +490,13 @@ export default function Finance() {
               <tbody>
                 {(incomes.data ?? []).map((i) => (
                   <tr key={i.id}>
-                    <td><strong>{i.source}</strong><div className="alert-msg">{i.cadence}</div></td>
+                    <td><strong>{i.source}</strong><div className="alert-msg">{i.cadence} {i.isActive ? "· aktiv" : "· pausiert"}</div></td>
                     <td className="num">{euro(i.amount, i.currency)}</td>
                     <td className="num">
+                      <button className="btn ghost small icon-only" aria-label={i.isActive ? "Einnahme pausieren" : "Einnahme aktivieren"} title={i.isActive ? "Einnahme pausieren" : "Einnahme aktivieren"} onClick={() => toggleIncome(i)}>
+                        <i className={`fa-solid ${i.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
+                        <span className="sr-only">Status</span>
+                      </button>{" "}
                       <button className="btn ghost small icon-only" aria-label="Einnahme bearbeiten" title="Einnahme bearbeiten" onClick={() => editIncome(i)}>
                         <i className="fa-solid fa-pen-to-square" aria-hidden />
                         <span className="sr-only">Bearbeiten</span>
@@ -356,6 +510,28 @@ export default function Finance() {
                 ))}
               </tbody>
             </table>
+
+            <form className="form-grid" style={{ marginTop: 16 }} onSubmit={addIncome}>
+              <label className="field">Quelle
+                <input value={newIncome.source} required onChange={(e) => setNewIncome({ ...newIncome, source: e.target.value })} />
+              </label>
+              <label className="field">Betrag
+                <input type="number" step="0.01" value={newIncome.amount} required onChange={(e) => setNewIncome({ ...newIncome, amount: e.target.value })} />
+              </label>
+              <label className="field">Turnus
+                <select value={newIncome.cadence} onChange={(e) => setNewIncome({ ...newIncome, cadence: e.target.value })}>
+                  <option value="monthly">monthly</option>
+                  <option value="yearly">yearly</option>
+                  <option value="onetime">onetime</option>
+                </select>
+              </label>
+              <label className="field">&nbsp;
+                <button className="btn icon-only" aria-label="Einnahme anlegen" title="Einnahme anlegen">
+                  <i className="fa-solid fa-plus" aria-hidden />
+                  <span className="sr-only">Einnahme anlegen</span>
+                </button>
+              </label>
+            </form>
           </div>
         </Section>
 
@@ -366,9 +542,13 @@ export default function Finance() {
               <tbody>
                 {(costs.data ?? []).map((c) => (
                   <tr key={c.id}>
-                    <td><strong>{c.name}</strong><div className="alert-msg">{c.category ?? "sonstige"}</div></td>
+                    <td><strong>{c.name}</strong><div className="alert-msg">{c.category ?? "sonstige"} {c.isActive ? "· aktiv" : "· pausiert"}</div></td>
                     <td className="num">{euro(c.amount, c.currency)}</td>
                     <td className="num">
+                      <button className="btn ghost small icon-only" aria-label={c.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} title={c.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} onClick={() => toggleCost(c)}>
+                        <i className={`fa-solid ${c.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
+                        <span className="sr-only">Status</span>
+                      </button>{" "}
                       <button className="btn ghost small icon-only" aria-label="Fixkosten bearbeiten" title="Fixkosten bearbeiten" onClick={() => editCost(c)}>
                         <i className="fa-solid fa-pen-to-square" aria-hidden />
                         <span className="sr-only">Bearbeiten</span>
@@ -382,6 +562,31 @@ export default function Finance() {
                 ))}
               </tbody>
             </table>
+
+            <form className="form-grid" style={{ marginTop: 16 }} onSubmit={addCost}>
+              <label className="field">Name
+                <input value={newCost.name} required onChange={(e) => setNewCost({ ...newCost, name: e.target.value })} />
+              </label>
+              <label className="field">Betrag
+                <input type="number" step="0.01" value={newCost.amount} required onChange={(e) => setNewCost({ ...newCost, amount: e.target.value })} />
+              </label>
+              <label className="field">Turnus
+                <select value={newCost.cadence} onChange={(e) => setNewCost({ ...newCost, cadence: e.target.value })}>
+                  <option value="monthly">monthly</option>
+                  <option value="yearly">yearly</option>
+                  <option value="onetime">onetime</option>
+                </select>
+              </label>
+              <label className="field">Kategorie
+                <input value={newCost.category} onChange={(e) => setNewCost({ ...newCost, category: e.target.value })} />
+              </label>
+              <label className="field">&nbsp;
+                <button className="btn icon-only" aria-label="Fixkosten anlegen" title="Fixkosten anlegen">
+                  <i className="fa-solid fa-plus" aria-hidden />
+                  <span className="sr-only">Fixkosten anlegen</span>
+                </button>
+              </label>
+            </form>
           </div>
         </Section>
       </div>

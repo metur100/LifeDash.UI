@@ -11,14 +11,21 @@ export default function HomeItems() {
   const items = useAsync<HomeItem[]>(() => api.get("/api/home-items"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ kind: "repair", title: "", room: "" });
+  const [draft, setDraft] = useState({ kind: "repair", title: "", room: "", warrantyUntil: "" });
 
   async function add(e: FormEvent) {
     e.preventDefault();
     if (!draft.title.trim()) return;
     try {
-      await api.post("/api/home-items", { ...draft, currency: "EUR", status: "open" });
-      setDraft({ kind: "repair", title: "", room: "" });
+      await api.post("/api/home-items", {
+        kind: draft.kind,
+        title: draft.title,
+        room: draft.room || null,
+        warrantyUntil: draft.warrantyUntil || null,
+        currency: "EUR",
+        status: "open",
+      });
+      setDraft({ kind: "repair", title: "", room: "", warrantyUntil: "" });
       items.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -26,6 +33,13 @@ export default function HomeItems() {
   async function complete(item: HomeItem) {
     try {
       await api.put(`/api/home-items/${item.id}`, { ...item, status: "done" });
+      items.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function reopen(item: HomeItem) {
+    try {
+      await api.put(`/api/home-items/${item.id}`, { ...item, status: "open" });
       items.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -99,7 +113,8 @@ export default function HomeItems() {
   const all = items.data ?? [];
   const repairs = all.filter((i) => i.kind === "repair" && i.status !== "done");
   const purchases = all.filter((i) => i.kind === "purchase");
-  const warranties = all.filter((i) => i.warrantyUntil);
+  const warranties = all.filter((i) => i.kind === "warranty" || i.warrantyUntil);
+  const doneItems = all.filter((i) => i.status === "done");
 
   return (
     <>
@@ -152,6 +167,9 @@ export default function HomeItems() {
             <label className="field">Raum
               <input value={draft.room} onChange={(e) => setDraft({ ...draft, room: e.target.value })} />
             </label>
+            <label className="field">Garantie bis
+              <input type="date" value={draft.warrantyUntil} onChange={(e) => setDraft({ ...draft, warrantyUntil: e.target.value })} />
+            </label>
             <label className="field">&nbsp;
               <button className="btn icon-only" aria-label="Eintrag hinzufügen" title="Eintrag hinzufügen">
                 <i className="fa-solid fa-plus" aria-hidden />
@@ -176,9 +194,11 @@ export default function HomeItems() {
                         <tr key={w.id}>
                           <td><strong>{w.title}</strong><div className="alert-msg">{w.vendor ?? w.room ?? ""}</div></td>
                           <td className="num">
-                            <span className={`badge ${d !== null && d < 0 ? "red" : d !== null && d <= 60 ? "amber" : "green"}`}>
-                              {d !== null && d < 0 ? "abgelaufen" : countdown(d)}
-                            </span>
+                            {w.warrantyUntil
+                              ? <span className={`badge ${d !== null && d < 0 ? "red" : d !== null && d <= 60 ? "amber" : "green"}`}>
+                                  {d !== null && d < 0 ? "abgelaufen" : countdown(d)}
+                                </span>
+                              : <span className="badge">ohne Datum</span>}
                           </td>
                           <td className="num">
                             <button className="btn ghost small icon-only" aria-label="Garantie bearbeiten" title="Garantie bearbeiten" onClick={() => editItem(w)}>
@@ -224,6 +244,35 @@ export default function HomeItems() {
           </div>
         </Section>
       </div>
+
+      <Section title="Verlauf erledigt/geschlossen">
+        <div className="card">
+          {doneItems.length === 0
+            ? <Empty title="Noch nichts abgeschlossen." hint="Als erledigt markierte Einträge erscheinen hier." />
+            : <table>
+                <thead><tr><th>Eintrag</th><th>Art</th><th>Status</th><th className="num">Aktion</th></tr></thead>
+                <tbody>
+                  {doneItems.map((d) => (
+                    <tr key={d.id}>
+                      <td><strong>{d.title}</strong><div className="alert-msg">{d.room ?? d.vendor ?? ""}</div></td>
+                      <td>{d.kind}</td>
+                      <td><span className="badge green">done</span></td>
+                      <td className="num">
+                        <button className="btn ghost small icon-only" aria-label="Wieder öffnen" title="Wieder öffnen" onClick={() => reopen(d)}>
+                          <i className="fa-solid fa-rotate-left" aria-hidden />
+                          <span className="sr-only">Wieder öffnen</span>
+                        </button>{" "}
+                        <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeItem(d.id)}>
+                          <i className="fa-solid fa-trash" aria-hidden />
+                          <span className="sr-only">Löschen</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>}
+        </div>
+      </Section>
     </>
   );
 }
