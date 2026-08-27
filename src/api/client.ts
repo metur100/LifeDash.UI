@@ -1,4 +1,18 @@
-const BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:5080").replace(/\/$/, "");
+function resolveApiBase(): string {
+  const raw = (import.meta.env.VITE_API_URL ?? "http://localhost:5080").trim().replace(/\/$/, "");
+  try {
+    const url = new URL(raw);
+    const localHost = ["localhost", "127.0.0.1"].includes(url.hostname);
+    if (window.location.protocol === "https:" && url.protocol === "http:" && !localHost) {
+      url.protocol = "https:";
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return raw;
+  }
+}
+
+const BASE = resolveApiBase();
 const TOKEN_KEY = "lifedash.token";
 
 export function getToken(): string | null {
