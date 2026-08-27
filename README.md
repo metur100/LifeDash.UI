@@ -28,7 +28,7 @@ Vite inlines these at build time - rebuild after changing them.
 1. Cloudflare dashboard -> Workers & Pages -> Create -> Pages -> connect your repo.
 2. Build command `npm run build`, output directory `dist`, root directory `frontend`.
 3. Settings -> Environment variables -> add `VITE_API_URL` for Production and Preview.
-4. `public/_redirects` is already included, so client-side routes resolve correctly.
+4. Client-side routes are handled by Wrangler's SPA fallback (`assets.not_found_handling = "single-page-application"`).
 
 ## Deploy to GitHub Pages
 
