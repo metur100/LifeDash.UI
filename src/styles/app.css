@@ -1055,8 +1055,9 @@ textarea { min-height: 70px; resize: vertical; }
 
 .person-detail-value.is-code {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-overflow: clip;
   overflow-wrap: normal;
   word-break: normal;
 }
