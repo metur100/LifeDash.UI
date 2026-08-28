@@ -1053,6 +1053,14 @@ textarea { min-height: 70px; resize: vertical; }
   overflow-wrap: anywhere;
 }
 
+.person-detail-value.is-code {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 .person-detail-row .btn {
   grid-row: 1 / span 2;
   align-self: center;

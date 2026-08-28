@@ -1211,10 +1211,19 @@ export default function Family() {
                   <div key={`group-${group.title}`} className="person-details-group-title">{group.title}</div>,
                   ...group.rows.map(([label, value]) => {
                     const copied = copiedField === label;
+                    const isCodeLikeField = [
+                      "Steuer-ID",
+                      "Identifikationsnummer",
+                      "Rentenversicherungsnummer",
+                      "Ausweisnummer",
+                      "Passnummer",
+                      "Versicherungsnummer",
+                      "IBAN",
+                    ].includes(label);
                     return (
                       <div key={label} className="person-detail-row">
                         <div className="person-detail-label">{label}</div>
-                        <div className="person-detail-value" title={value || ""}>{value || "—"}</div>
+                        <div className={`person-detail-value${isCodeLikeField ? " is-code" : ""}`} title={value || ""}>{value || "—"}</div>
                         <button
                           className="btn ghost small icon-only"
                           onClick={() => { void copyValue(label, value); }}
