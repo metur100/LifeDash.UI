@@ -773,21 +773,21 @@ export default function Family() {
                     key={cell.iso}
                     className={`family-calendar-cell ${cell.inMonth ? "" : "out"} ${(items.length + importantItems.length) > 0 ? "has-items" : ""}`}
                     title={cellTitle}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { void addAppointmentAtDate(cell.iso); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        void addAppointmentAtDate(cell.iso);
+                      }
+                    }}
                   >
                     <div className="calendar-cell-head">
                       <span className="day">{cell.day}</span>
                       {hasNearReminder && <span className="calendar-reminder-dot" title="Erinnerung in den nächsten 2 Tagen" />}
-                      <button
-                        className="btn ghost small icon-only calendar-add-btn"
-                        title="Termin anlegen"
-                        aria-label="Termin anlegen"
-                        onClick={() => addAppointmentAtDate(cell.iso)}
-                      >
-                        <i className="fa-solid fa-plus" aria-hidden />
-                        <span className="sr-only">Termin anlegen</span>
-                      </button>
                     </div>
-                    {importantItems.slice(0, 2).map((d) => (
+                    {importantItems.map((d) => (
                       <span
                         key={`imp-${d.id}`}
                         className="appt important-date"
@@ -796,7 +796,7 @@ export default function Family() {
                         {d.title}
                       </span>
                     ))}
-                    {items.slice(0, 2).map((a) => (
+                    {items.map((a) => (
                       <span
                         key={a.id}
                         className={`appt appt-cat-${normalizeCategory(a.category)}`}
@@ -816,7 +816,6 @@ export default function Family() {
                         </button>
                       </span>
                     ))}
-                    {(importantItems.length + items.length) > 4 && <span className="appt more">+{(importantItems.length + items.length) - 4}</span>}
                   </div>
                 );
               })}

@@ -714,7 +714,13 @@ textarea { min-height: 70px; resize: vertical; }
   flex-direction: column;
   gap: 4px;
   position: relative;
+  cursor: pointer;
   transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.family-calendar-cell:hover,
+.family-calendar-cell:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .calendar-cell-head {
