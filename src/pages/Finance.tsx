@@ -39,6 +39,7 @@ const COST_CATEGORY_OPTIONS = [
   { value: "auto", label: "Auto" },
   { value: "gesundheit", label: "Gesundheit" },
   { value: "lebensmittel", label: "Lebensmittel" },
+  { value: "online-kaeufe", label: "Online-Käufe" },
   { value: "sonstiges", label: "Sonstiges" },
 ];
 
@@ -79,6 +80,7 @@ type UpcomingItem = {
 
 type FixedCostMeta = {
   billingDate: string | null;
+  costType: "fixed" | "variable";
 };
 
 type PaymentMeta = {
@@ -132,12 +134,15 @@ function writeMetaBlock(notes: string | null | undefined, startTag: string, endT
 function parseFixedCostMeta(notes?: string | null): FixedCostMeta {
   const parsed = parseMetaBlock(notes, FINANCE_META_START, FINANCE_META_END);
   const billingDate = parsed.values.get("billingDate") ?? null;
-  return { billingDate };
+  const costTypeRaw = (parsed.values.get("costType") ?? "fixed").toLowerCase();
+  const costType = costTypeRaw === "variable" ? "variable" : "fixed";
+  return { billingDate, costType };
 }
 
 function withFixedCostMeta(notes: string | null | undefined, meta: FixedCostMeta): string | null {
   return writeMetaBlock(notes, FINANCE_META_START, FINANCE_META_END, [
     ["billingDate", meta.billingDate],
+    ["costType", meta.costType === "variable" ? "variable" : null],
   ]);
 }
 
@@ -313,9 +318,6 @@ export default function Finance() {
     const leftMonth = monthIncome - monthCosts - dueThisMonth;
     const leftYear = yearIncome - yearCosts - oneTimeThisYear;
 
-    const saveMonth = Math.max(0, leftMonth);
-    const saveYear = Math.max(0, leftYear);
-
     return {
       monthIncome,
       yearIncome,
@@ -323,8 +325,6 @@ export default function Finance() {
       yearCosts,
       leftMonth,
       leftYear,
-      saveMonth,
-      saveYear,
     };
   }, [incomes.data, costLines, payments.data]);
 
@@ -750,9 +750,23 @@ export default function Finance() {
   }
 
   async function editCost(c: FixedCost) {
+    const meta = parseFixedCostMeta(c.notes);
+    const kindInitial = meta.costType === "variable" || (!meta.billingDate && !c.dayOfMonth)
+      ? "variable"
+      : "fixed";
+
     const values = await dialog.form({
-      title: "Fixkosten bearbeiten",
+      title: "Kostenpunkt bearbeiten",
       fields: [
+        {
+          key: "kind",
+          label: "Art",
+          type: "select",
+          options: [
+            { value: "fixed", label: "Fixkosten" },
+            { value: "variable", label: "Variable" },
+          ],
+        },
         { key: "name", label: "Name" },
         { key: "amount", label: "Betrag", type: "number" },
         {
@@ -766,22 +780,40 @@ export default function Finance() {
             { value: "onetime", label: "onetime" },
           ],
         },
-        { key: "billingDate", label: "Zahlungsdatum", type: "date" },
+        {
+          key: "billingDate",
+          label: "Zahlungsdatum",
+          type: "date",
+          visibleWhen: (draft) => String(draft.kind ?? "fixed") === "fixed",
+        },
         { key: "category", label: "Kategorie", type: "select", options: categoryOptions(c.category) },
       ],
       initial: {
+        kind: kindInitial,
         name: c.name,
         amount: String(c.amount),
         cadence: c.cadence,
-        billingDate: parseFixedCostMeta(c.notes).billingDate ?? nextDateForDay(c.dayOfMonth ?? 1),
+        billingDate: meta.billingDate ?? "",
         category: c.category ?? "",
       },
     });
     if (!values) return;
 
     try {
-      const billingDate = String(values.billingDate ?? "").trim() || null;
-      const safeDay = billingDate ? parseIsoDate(billingDate).getDate() : parseOptionalDay(c.dayOfMonth);
+      const kind = String(values.kind) === "variable" ? "variable" : "fixed";
+      const billingDate = kind === "fixed"
+        ? (String(values.billingDate ?? "").trim() || null)
+        : null;
+
+      if (kind === "fixed" && !billingDate) {
+        setError("Für Fixkosten bitte ein Zahlungsdatum wählen.");
+        return;
+      }
+
+      const safeDay = kind === "fixed" && billingDate
+        ? parseIsoDate(billingDate).getDate()
+        : null;
+
       await api.put(`/api/fixed-costs/${c.id}`, {
         ...c,
         name: String(values.name).trim(),
@@ -789,7 +821,10 @@ export default function Finance() {
         cadence: String(values.cadence),
         dayOfMonth: safeDay,
         category: String(values.category).trim() || null,
-        notes: withFixedCostMeta(c.notes, { billingDate }),
+        notes: withFixedCostMeta(c.notes, {
+          billingDate,
+          costType: kind,
+        }),
       });
       costs.reload();
     } catch (e) {
@@ -830,7 +865,7 @@ export default function Finance() {
             { value: "yearly", label: "yearly" },
           ],
         },
-        { key: "renewsOn", label: "Fällig/Verlängerung", type: "date" },
+        { key: "renewsOn", label: "Zahlungsdatum", type: "date" },
         { key: "cancelByOn", label: "Kündigen bis", type: "date" },
         { key: "provider", label: "Kategorie", type: "select", options: categoryOptions(s.provider) },
       ],
@@ -887,6 +922,7 @@ export default function Finance() {
           label: "Art",
           type: "select",
           options: [
+            { value: "variable", label: "Variable" },
             { value: "fixed", label: "Fixkosten" },
             { value: "subscription", label: "Abo/Vertrag" },
           ],
@@ -901,20 +937,34 @@ export default function Finance() {
             { value: "monthly", label: "monthly" },
             { value: "quarterly", label: "quarterly" },
             { value: "yearly", label: "yearly" },
-            { value: "onetime", label: "onetime" },
           ],
         },
-        { key: "billingDate", label: "Zahlungsdatum (nur Fixkosten)", type: "date" },
-        { key: "renewsOn", label: "Fälligkeitsdatum (Abo/Vertrag)", type: "date" },
-        { key: "cancelByOn", label: "Kündigen bis (Abo/Vertrag)", type: "date" },
+        {
+          key: "billingDate",
+          label: "Zahlungsdatum",
+          type: "date",
+          visibleWhen: (draft) => String(draft.kind ?? "") === "fixed",
+        },
+        {
+          key: "renewsOn",
+          label: "Zahlungsdatum",
+          type: "date",
+          visibleWhen: (draft) => String(draft.kind ?? "") === "subscription",
+        },
+        {
+          key: "cancelByOn",
+          label: "Kündigungsdatum",
+          type: "date",
+          visibleWhen: (draft) => String(draft.kind ?? "") === "subscription",
+        },
         { key: "category", label: "Kategorie", type: "select", options: categoryOptions("sonstiges") },
       ],
       initial: {
-        kind: "fixed",
+        kind: "variable",
         name: "",
         amount: "",
         cadence: "monthly",
-        billingDate: today(),
+        billingDate: "",
         renewsOn: today(),
         cancelByOn: "",
         category: "",
@@ -930,20 +980,33 @@ export default function Finance() {
     const category = String(values.category).trim() || null;
     if (!name || !Number.isFinite(amount) || amount <= 0) return;
 
-    const billingDate = String(values.billingDate ?? "").trim() || null;
+    const billingDate = kind === "fixed"
+      ? String(values.billingDate ?? "").trim() || null
+      : null;
     try {
       if (kind === "subscription") {
+        const renewsOn = String(values.renewsOn ?? "").trim();
+        if (!renewsOn) {
+          setError("Für Abo/Vertrag bitte ein Zahlungsdatum wählen.");
+          return;
+        }
+
         await api.post("/api/subscriptions", {
           name,
           amount,
-          cadence: cadence === "onetime" ? "yearly" : cadence,
-          renewsOn: String(values.renewsOn || today()),
+          cadence,
+          renewsOn,
           cancelByOn: String(values.cancelByOn).trim() || null,
           provider: category,
           currency: "EUR",
           isActive: true,
         });
       } else {
+        if (kind === "fixed" && !billingDate) {
+          setError("Für Fixkosten bitte ein Zahlungsdatum wählen.");
+          return;
+        }
+
         await api.post("/api/fixed-costs", {
           name,
           amount,
@@ -952,7 +1015,10 @@ export default function Finance() {
           category,
           currency: "EUR",
           isActive: true,
-          notes: withFixedCostMeta(null, { billingDate }),
+          notes: withFixedCostMeta(null, {
+            billingDate,
+            costType: kind === "variable" ? "variable" : "fixed",
+          }),
         });
       }
       costs.reload();
@@ -976,10 +1042,8 @@ export default function Finance() {
         <Stat label="Einnahmen / Jahr" value={euro(overview.yearIncome)} />
         <Stat label="Laufende Kosten / Monat" value={euro(overview.monthCosts)} />
         <Stat label="Laufende Kosten / Jahr" value={euro(overview.yearCosts)} />
-        <Stat label="Bleibt übrig / Monat" value={euro(overview.leftMonth)} tone={overview.leftMonth < 0 ? "neg" : "pos"} />
-        <Stat label="Bleibt übrig / Jahr" value={euro(overview.leftYear)} tone={overview.leftYear < 0 ? "neg" : "pos"} />
-        <Stat label="Sparen möglich / Monat" value={euro(overview.saveMonth)} tone="pos" />
-        <Stat label="Sparen möglich / Jahr" value={euro(overview.saveYear)} tone="pos" />
+        <Stat className="wide" label="Bleibt übrig / Monat" value={euro(overview.leftMonth)} tone={overview.leftMonth < 0 ? "neg" : "pos"} />
+        <Stat className="wide" label="Bleibt übrig / Jahr" value={euro(overview.leftYear)} tone={overview.leftYear < 0 ? "neg" : "pos"} />
       </div>
 
       <Section
@@ -1133,6 +1197,7 @@ export default function Finance() {
                       <td className="hide-phone">
                         {line.source === "fixed"
                           ? (() => {
+                            if (fixedMeta?.costType === "variable") return "Variable";
                             const anchor = fixedMeta?.billingDate;
                             if (!anchor || !line.dayOfMonth) return "kein Zahltag";
                             const label = cadenceLabel[line.cadence] ?? line.cadence;

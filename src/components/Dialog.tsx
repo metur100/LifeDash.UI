@@ -8,6 +8,7 @@ type DialogField = {
   label: string;
   type?: "text" | "number" | "date" | "datetime-local" | "select";
   options?: Option[];
+  visibleWhen?: (draft: Record<string, unknown>) => boolean;
 };
 
 type ConfirmOptions = {
@@ -112,7 +113,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   closeForm(state.draft);
                 }}
               >
-                {state.fields.map((f) => (
+                {state.fields.filter((f) => f.visibleWhen ? f.visibleWhen(state.draft) : true).map((f) => (
                   <label className="field" key={f.key}>
                     {f.label}
                     {f.type === "select" ? (

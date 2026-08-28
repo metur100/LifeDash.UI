@@ -35,10 +35,10 @@ export function Section({ title, action, children }:
   );
 }
 
-export function Stat({ label, value, note, tone }:
-  { label: string; value: string; note?: string; tone?: "pos" | "neg" }) {
+export function Stat({ label, value, note, tone, className }:
+  { label: string; value: string; note?: string; tone?: "pos" | "neg"; className?: string }) {
   return (
-    <div className="stat">
+    <div className={`stat ${className ?? ""}`.trim()}>
       <div className="stat-label">{label}</div>
       <div className={`stat-value ${tone ?? ""}`}>{value}</div>
       {note && <div className="stat-note">{note}</div>}

@@ -402,6 +402,7 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
 .finance-stats { grid-template-columns: repeat(4, minmax(220px, 1fr)); }
+.finance-stats .stat.wide { grid-column: span 2; }
 .stat {
   background: linear-gradient(180deg, #ffffff, #f7fbff);
   border: 1px solid var(--line);
@@ -427,6 +428,7 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
 
 @media (max-width: 980px) {
   .finance-stats { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+  .finance-stats .stat.wide { grid-column: span 1; }
 }
 
 @media (max-width: 640px) {
