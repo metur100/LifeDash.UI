@@ -83,6 +83,64 @@ function addMonth(d: Date, delta: number) {
   return new Date(d.getFullYear(), d.getMonth() + delta, 1);
 }
 
+const APPOINTMENT_CATEGORIES = [
+  { value: "family", label: "Familie" },
+  { value: "birthday", label: "Geburtstag" },
+  { value: "anniversary", label: "Jahrestag" },
+  { value: "authority", label: "Behörde" },
+  { value: "health", label: "Gesundheit" },
+  { value: "school", label: "Schule" },
+  { value: "work", label: "Arbeit" },
+  { value: "finance", label: "Finanzen" },
+  { value: "travel", label: "Reise" },
+  { value: "home", label: "Haushalt" },
+  { value: "other", label: "Sonstiges" },
+];
+
+const categoryLabelByValue = new Map(APPOINTMENT_CATEGORIES.map((x) => [x.value, x.label]));
+
+function categoryLabel(category?: string | null): string {
+  const key = String(category ?? "").trim().toLowerCase();
+  return categoryLabelByValue.get(key) ?? (key || "Termin");
+}
+
+function normalizeCategory(category?: string | null): string {
+  const key = String(category ?? "").trim().toLowerCase();
+  return categoryLabelByValue.has(key) ? key : "other";
+}
+
+function nextImportantOccurrence(d: ImportantDate, fromIso = today()): string {
+  if (!d.repeatsYearly) return d.dateValue;
+
+  const [y, m, day] = d.dateValue.split("-").map(Number);
+  if (!y || !m || !day) return d.dateValue;
+
+  const [fromYear] = fromIso.split("-").map(Number);
+  const safeDayThisYear = Math.min(day, new Date(fromYear, m, 0).getDate());
+  const thisYearIso = dateIso(new Date(fromYear, m - 1, safeDayThisYear));
+  if (thisYearIso >= fromIso) return thisYearIso;
+
+  const nextYear = fromYear + 1;
+  const safeDayNextYear = Math.min(day, new Date(nextYear, m, 0).getDate());
+  return dateIso(new Date(nextYear, m - 1, safeDayNextYear));
+}
+
+function occurrenceInMonth(d: ImportantDate, cursor: Date): string | null {
+  const month = cursor.getMonth() + 1;
+  const year = cursor.getFullYear();
+
+  const [rawYear, rawMonth, rawDay] = d.dateValue.split("-").map(Number);
+  if (!rawYear || !rawMonth || !rawDay) return null;
+
+  if (!d.repeatsYearly) {
+    return rawYear === year && rawMonth === month ? d.dateValue : null;
+  }
+
+  if (rawMonth !== month) return null;
+  const safeDay = Math.min(rawDay, new Date(year, month, 0).getDate());
+  return dateIso(new Date(year, month - 1, safeDay));
+}
+
 export default function Family() {
   const members = useAsync<FamilyMember[]>(() => api.get("/api/family-members"), []);
   const appts = useAsync<Appointment[]>(() => api.get("/api/appointments"), []);
@@ -237,12 +295,14 @@ export default function Family() {
         { key: "title", label: "Termin" },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
+        { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
         { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
       ],
       initial: {
         title: a.title,
         startsAt: a.startsAt.slice(0, 16),
         location: a.location ?? "",
+        category: normalizeCategory(a.category),
         familyMemberId: a.familyMemberId ? String(a.familyMemberId) : "",
       },
     });
@@ -254,6 +314,7 @@ export default function Family() {
         title: String(values.title).trim(),
         startsAt: String(values.startsAt).trim() ? new Date(String(values.startsAt)).toISOString() : a.startsAt,
         location: String(values.location).trim() || null,
+        category: normalizeCategory(String(values.category)),
         familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
       });
       appts.reload();
@@ -326,12 +387,7 @@ export default function Family() {
         { key: "title", label: "Termin" },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
-        { key: "category", label: "Kategorie", type: "select", options: [
-          { value: "family", label: "family" },
-          { value: "authority", label: "authority" },
-          { value: "health", label: "health" },
-          { value: "home", label: "home" },
-        ] },
+        { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
         { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
       ],
       initial: {
@@ -350,7 +406,7 @@ export default function Family() {
         title: String(values.title).trim(),
         startsAt: new Date(String(values.startsAt)).toISOString(),
         location: String(values.location).trim() || null,
-        category: String(values.category),
+        category: normalizeCategory(String(values.category)),
         familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
         reminderDays: 3,
         isDone: false,
@@ -372,12 +428,7 @@ export default function Family() {
         { key: "title", label: "Termin" },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
-        { key: "category", label: "Kategorie", type: "select", options: [
-          { value: "family", label: "family" },
-          { value: "authority", label: "authority" },
-          { value: "health", label: "health" },
-          { value: "home", label: "home" },
-        ] },
+        { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
         { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
       ],
       initial: {
@@ -400,7 +451,7 @@ export default function Family() {
         title: String(values.title).trim(),
         startsAt,
         location: String(values.location).trim() || null,
-        category: String(values.category),
+        category: normalizeCategory(String(values.category)),
         familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
         reminderDays: 3,
         isDone: false,
@@ -458,6 +509,18 @@ export default function Family() {
     }
     return map;
   }, [appts.data]);
+
+  const importantByDay = useMemo(() => {
+    const map = new Map<string, ImportantDate[]>();
+    for (const d of (dates.data ?? [])) {
+      const iso = occurrenceInMonth(d, monthCursor);
+      if (!iso) continue;
+      const list = map.get(iso) ?? [];
+      list.push(d);
+      map.set(iso, list);
+    }
+    return map;
+  }, [dates.data, monthCursor]);
 
   const calendarCells = useMemo(() => {
     const start = monthStartDate(monthCursor);
@@ -555,20 +618,31 @@ export default function Family() {
                 "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So",
               ].map((wd) => <div key={wd} className="family-calendar-wd">{wd}</div>)}
 
+              <div className="family-calendar-legend">
+                {APPOINTMENT_CATEGORIES.map((c) => (
+                  <span key={c.value} className={`badge appt-cat-${c.value}`}>{c.label}</span>
+                ))}
+                <span className="badge important-date">Wichtige Daten</span>
+              </div>
+
               {calendarCells.map((cell) => {
                 const items = apptByDay.get(cell.iso) ?? [];
+                const importantItems = importantByDay.get(cell.iso) ?? [];
                 return (
                   <button
                     key={cell.iso}
-                    className={`family-calendar-cell ${cell.inMonth ? "" : "out"}`}
+                    className={`family-calendar-cell ${cell.inMonth ? "" : "out"} ${(items.length + importantItems.length) > 0 ? "has-items" : ""}`}
                     onClick={() => addAppointmentAtDate(cell.iso)}
                     title="Termin anlegen"
                   >
                     <span className="day">{cell.day}</span>
-                    {items.slice(0, 2).map((a) => (
-                      <span key={a.id} className="appt">{a.title}</span>
+                    {importantItems.slice(0, 2).map((d) => (
+                      <span key={`imp-${d.id}`} className="appt important-date">{d.title}</span>
                     ))}
-                    {items.length > 2 && <span className="appt more">+{items.length - 2}</span>}
+                    {items.slice(0, 2).map((a) => (
+                      <span key={a.id} className={`appt appt-cat-${normalizeCategory(a.category)}`}>{a.title}</span>
+                    ))}
+                    {(importantItems.length + items.length) > 4 && <span className="appt more">+{(importantItems.length + items.length) - 4}</span>}
                   </button>
                 );
               })}
@@ -585,7 +659,7 @@ export default function Family() {
                         <td>
                           <strong>{a.title}</strong>
                           <div className="alert-msg">
-                            {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
+                            {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
                             {a.familyMemberId ? ` · ${memberNameById.get(a.familyMemberId) ?? "Person"}` : ""}
                           </div>
                         </td>
@@ -623,7 +697,7 @@ export default function Family() {
                       <td>
                         <strong>{a.title}</strong>
                           <div className="alert-msg">
-                            {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
+                            {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
                             {a.familyMemberId ? ` · ${memberNameById.get(a.familyMemberId) ?? "Person"}` : ""}
                           </div>
                       </td>
@@ -660,7 +734,7 @@ export default function Family() {
                       <td><strong>{d.title}</strong></td>
                       <td>{shortDate(d.dateValue)}</td>
                       <td>{d.repeatsYearly ? "jährlich" : "einmalig"}</td>
-                      <td className="num">{countdown(daysUntil(d.dateValue))}</td>
+                      <td className="num">{countdown(daysUntil(nextImportantOccurrence(d)))}</td>
                       <td className="num action-cell">
                         <div className="action-stack">
                         <button className="btn ghost small icon-only" aria-label="Datum bearbeiten" title="Datum bearbeiten" onClick={() => editDate(d)}>

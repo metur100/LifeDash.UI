@@ -684,6 +684,14 @@ textarea { min-height: 70px; resize: vertical; }
   gap: 6px;
 }
 
+.family-calendar-legend {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 8px;
+}
+
 .family-calendar-wd {
   font-family: var(--mono);
   font-size: 10px;
@@ -704,6 +712,11 @@ textarea { min-height: 70px; resize: vertical; }
   flex-direction: column;
   gap: 4px;
   cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.family-calendar-cell.has-items {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
 }
 
 .family-calendar-cell .day {
@@ -715,7 +728,11 @@ textarea { min-height: 70px; resize: vertical; }
   display: block;
   font-size: 10px;
   line-height: 1.2;
-  color: var(--text-soft);
+  color: #173042;
+  border-radius: 999px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  background: #ecf2f8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -724,6 +741,93 @@ textarea { min-height: 70px; resize: vertical; }
 .family-calendar-cell .appt.more {
   color: var(--accent);
   font-weight: 600;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.family-calendar-cell .appt.important-date,
+.badge.important-date {
+  color: #6b251a;
+  border-color: #f3c4b3;
+  background: #fff2ed;
+}
+
+.family-calendar-cell .appt.appt-cat-family,
+.badge.appt-cat-family {
+  color: #0f3f58;
+  border-color: #b8d7ea;
+  background: #ebf5fb;
+}
+
+.family-calendar-cell .appt.appt-cat-birthday,
+.badge.appt-cat-birthday {
+  color: #4f2b0c;
+  border-color: #f0cc9a;
+  background: #fff4e4;
+}
+
+.family-calendar-cell .appt.appt-cat-anniversary,
+.badge.appt-cat-anniversary {
+  color: #5a1f3e;
+  border-color: #e8bfd7;
+  background: #fff1f8;
+}
+
+.family-calendar-cell .appt.appt-cat-authority,
+.badge.appt-cat-authority {
+  color: #2f355e;
+  border-color: #c6cdf1;
+  background: #eef1ff;
+}
+
+.family-calendar-cell .appt.appt-cat-health,
+.badge.appt-cat-health {
+  color: #1d4f38;
+  border-color: #b8dfcc;
+  background: #edf9f2;
+}
+
+.family-calendar-cell .appt.appt-cat-school,
+.badge.appt-cat-school {
+  color: #3f2f63;
+  border-color: #d4c8f1;
+  background: #f4f0ff;
+}
+
+.family-calendar-cell .appt.appt-cat-work,
+.badge.appt-cat-work {
+  color: #3a3531;
+  border-color: #d8d2cc;
+  background: #f6f3f0;
+}
+
+.family-calendar-cell .appt.appt-cat-finance,
+.badge.appt-cat-finance {
+  color: #18503e;
+  border-color: #b9decf;
+  background: #edf8f3;
+}
+
+.family-calendar-cell .appt.appt-cat-travel,
+.badge.appt-cat-travel {
+  color: #15435a;
+  border-color: #b8d8ea;
+  background: #eaf5fb;
+}
+
+.family-calendar-cell .appt.appt-cat-home,
+.badge.appt-cat-home {
+  color: #53320f;
+  border-color: #e8cfb2;
+  background: #fbf3e8;
+}
+
+.family-calendar-cell .appt.appt-cat-other,
+.badge.appt-cat-other {
+  color: #374756;
+  border-color: #ced7df;
+  background: #f1f5f8;
 }
 
 .family-calendar-cell.out {
@@ -732,6 +836,19 @@ textarea { min-height: 70px; resize: vertical; }
 
 .family-calendar-cell:hover {
   border-color: var(--accent);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .family-calendar-cell .appt {
+  color: #dbe7f3;
+  background: #243446;
+}
+
+[data-theme="dark"] .family-calendar-cell .appt.important-date,
+[data-theme="dark"] .badge.important-date {
+  color: #ffddcf;
+  border-color: #8b4f3d;
+  background: #3a2721;
 }
 
 .empty {

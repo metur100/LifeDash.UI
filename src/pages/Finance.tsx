@@ -74,6 +74,16 @@ type UpcomingItem = {
   currency: string;
   dueOn: string;
   payment?: Payment;
+  cadence?: string;
+};
+
+type FixedCostMeta = {
+  billingDate: string | null;
+};
+
+type PaymentMeta = {
+  cadence: string;
+  anchorDate: string | null;
 };
 
 const parseNumber = (value: unknown) => Number(String(value ?? "0").replace(",", "."));
@@ -81,6 +91,72 @@ const parseOptionalDay = (value: unknown) => {
   const n = Number(String(value ?? "").trim());
   return Number.isFinite(n) && n >= 1 && n <= 31 ? n : null;
 };
+
+const FINANCE_META_START = "[finance-meta]";
+const FINANCE_META_END = "[/finance-meta]";
+const PAYMENT_META_START = "[payment-meta]";
+const PAYMENT_META_END = "[/payment-meta]";
+
+function parseMetaBlock(notes: string | null | undefined, startTag: string, endTag: string) {
+  const text = notes ?? "";
+  const start = text.indexOf(startTag);
+  const end = text.indexOf(endTag);
+  if (start < 0 || end < 0 || end <= start) return { values: new Map<string, string>(), plain: text.trim() };
+
+  const raw = text.slice(start + startTag.length, end).trim();
+  const values = new Map<string, string>();
+  for (const line of raw.split("\n").map((x) => x.trim()).filter(Boolean)) {
+    const idx = line.indexOf(":");
+    if (idx <= 0) continue;
+    values.set(line.slice(0, idx).trim(), line.slice(idx + 1).trim());
+  }
+
+  const before = text.slice(0, start).trim();
+  const after = text.slice(end + endTag.length).trim();
+  const plain = [before, after].filter(Boolean).join("\n\n").trim();
+  return { values, plain };
+}
+
+function writeMetaBlock(notes: string | null | undefined, startTag: string, endTag: string, entries: Array<[string, string | null]>) {
+  const parsed = parseMetaBlock(notes, startTag, endTag);
+  const lines = entries
+    .filter(([, value]) => !!value)
+    .map(([key, value]) => `${key}:${String(value)}`);
+
+  if (lines.length === 0) return parsed.plain || null;
+
+  const block = `${startTag}\n${lines.join("\n")}\n${endTag}`;
+  return parsed.plain ? `${parsed.plain}\n\n${block}` : block;
+}
+
+function parseFixedCostMeta(notes?: string | null): FixedCostMeta {
+  const parsed = parseMetaBlock(notes, FINANCE_META_START, FINANCE_META_END);
+  const billingDate = parsed.values.get("billingDate") ?? null;
+  return { billingDate };
+}
+
+function withFixedCostMeta(notes: string | null | undefined, meta: FixedCostMeta): string | null {
+  return writeMetaBlock(notes, FINANCE_META_START, FINANCE_META_END, [
+    ["billingDate", meta.billingDate],
+  ]);
+}
+
+function parsePaymentMeta(notes?: string | null, dueOn?: string): PaymentMeta {
+  const parsed = parseMetaBlock(notes, PAYMENT_META_START, PAYMENT_META_END);
+  const cadenceRaw = (parsed.values.get("cadence") ?? "onetime").toLowerCase();
+  const cadence = cadenceRaw === "monthly" || cadenceRaw === "quarterly" || cadenceRaw === "yearly"
+    ? cadenceRaw
+    : "onetime";
+  const anchorDate = parsed.values.get("anchorDate") ?? dueOn ?? null;
+  return { cadence, anchorDate };
+}
+
+function withPaymentMeta(notes: string | null | undefined, meta: PaymentMeta): string | null {
+  return writeMetaBlock(notes, PAYMENT_META_START, PAYMENT_META_END, [
+    ["cadence", meta.cadence],
+    ["anchorDate", meta.anchorDate],
+  ]);
+}
 
 function addMonthsClamped(base: Date, months: number): Date {
   const y = base.getFullYear();
@@ -97,6 +173,10 @@ function addDays(baseIso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function parseIsoDate(iso: string): Date {
+  return new Date(`${iso}T00:00:00`);
+}
+
 function nextDateForDay(dayOfMonth: number, fromIso = today()): string {
   const from = new Date(`${fromIso}T00:00:00`);
   const currentYear = from.getFullYear();
@@ -109,6 +189,25 @@ function nextDateForDay(dayOfMonth: number, fromIso = today()): string {
   const nextMonth = new Date(currentYear, currentMonth + 1, 1);
   const maxNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
   return new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(dayOfMonth, maxNextMonth)).toISOString().slice(0, 10);
+}
+
+function addCadence(iso: string, cadence: string): string {
+  const date = parseIsoDate(iso);
+  const months = cadence === "monthly" ? 1 : cadence === "quarterly" ? 3 : cadence === "yearly" ? 12 : 0;
+  if (months <= 0) return iso;
+  return addMonthsClamped(date, months).toISOString().slice(0, 10);
+}
+
+function nextDueFromAnchor(anchorIso: string, cadence: string, fromIso = today()): string {
+  if (cadence !== "monthly" && cadence !== "quarterly" && cadence !== "yearly") return anchorIso;
+
+  let due = anchorIso;
+  let guard = 0;
+  while (due < fromIso && guard < 240) {
+    due = addCadence(due, cadence);
+    guard += 1;
+  }
+  return due;
 }
 
 function nextSubscriptionDue(sub: Subscription, fromIso = today()): string {
@@ -130,6 +229,8 @@ function nextSubscriptionDue(sub: Subscription, fromIso = today()): string {
 function monthId(iso: string): string {
   return iso.slice(0, 7);
 }
+
+const UPCOMING_HORIZON_DAYS = 400;
 
 function currentYear(iso = today()): number {
   return Number(iso.slice(0, 4));
@@ -253,7 +354,14 @@ export default function Finance() {
 
     const fixedPlanned = (costs.data ?? [])
       .filter((c) => c.isActive && !!c.dayOfMonth)
-      .map((c) => ({
+      .map((c) => {
+        const meta = parseFixedCostMeta(c.notes);
+        const fallbackAnchor = nextDateForDay(c.dayOfMonth as number);
+        const anchor = meta.billingDate ?? fallbackAnchor;
+        const dueOn = c.cadence === "monthly" || c.cadence === "quarterly" || c.cadence === "yearly"
+          ? nextDueFromAnchor(anchor, c.cadence)
+          : nextDateForDay(c.dayOfMonth as number);
+        return {
         key: `fixed-next-${c.id}`,
         source: "fixed" as const,
         id: c.id,
@@ -261,10 +369,12 @@ export default function Finance() {
         category: c.category?.trim() || "Fixkosten",
         amount: c.amount,
         currency: c.currency,
-        dueOn: nextDateForDay(c.dayOfMonth as number),
-      }))
+          dueOn,
+          cadence: c.cadence,
+        };
+      })
       .filter((x) => !existsAsPayment(x))
-      .filter((x) => withinDays(x.dueOn, 40));
+      .filter((x) => withinDays(x.dueOn, UPCOMING_HORIZON_DAYS));
 
     const subPlanned = (subs.data ?? [])
       .filter((s) => s.isActive)
@@ -277,9 +387,10 @@ export default function Finance() {
         amount: s.amount,
         currency: s.currency,
         dueOn: nextSubscriptionDue(s),
+        cadence: s.cadence,
       }))
       .filter((x) => !existsAsPayment(x))
-      .filter((x) => withinDays(x.dueOn, 40));
+      .filter((x) => withinDays(x.dueOn, UPCOMING_HORIZON_DAYS));
 
     return [...openManual, ...fixedPlanned, ...subPlanned].sort((a, b) => a.dueOn.localeCompare(b.dueOn));
   }, [payments.data, costs.data, subs.data]);
@@ -290,6 +401,33 @@ export default function Finance() {
 
   async function markPaid(p: Payment) {
     try {
+      const meta = parsePaymentMeta(p.notes, p.dueOn);
+      if (meta.cadence !== "onetime") {
+        let nextDue = addCadence(p.dueOn, meta.cadence);
+        while (nextDue <= today()) {
+          nextDue = addCadence(nextDue, meta.cadence);
+        }
+        const hasNext = (payments.data ?? []).some((x) =>
+          !x.isPaid &&
+          x.title === p.title &&
+          (x.category ?? "") === (p.category ?? "") &&
+          x.dueOn === nextDue &&
+          Math.abs(x.amount - p.amount) < 0.005,
+        );
+
+        if (!hasNext) {
+          await api.post("/api/payments", {
+            title: p.title,
+            amount: p.amount,
+            dueOn: nextDue,
+            category: p.category,
+            currency: p.currency,
+            isPaid: false,
+            notes: withPaymentMeta(p.notes, { cadence: meta.cadence, anchorDate: meta.anchorDate ?? p.dueOn }),
+          });
+        }
+      }
+
       await api.put(`/api/payments/${p.id}`, { ...p, isPaid: true, paidOn: today() });
       payments.reload();
     } catch (e) {
@@ -313,9 +451,21 @@ export default function Finance() {
         { key: "title", label: "Titel" },
         { key: "amount", label: "Betrag", type: "number" },
         { key: "dueOn", label: "Fällig am", type: "date" },
+        {
+          key: "cadence",
+          label: "Turnus",
+          type: "select",
+          options: [
+            { value: "onetime", label: "einmalig" },
+            { value: "monthly", label: "monthly" },
+            { value: "quarterly", label: "quarterly" },
+            { value: "yearly", label: "yearly" },
+          ],
+        },
         { key: "category", label: "Kategorie" },
       ],
       initial: {
+        cadence: parsePaymentMeta(p.notes, p.dueOn).cadence,
         title: p.title,
         amount: String(p.amount),
         dueOn: p.dueOn,
@@ -331,6 +481,10 @@ export default function Finance() {
         amount: parseNumber(values.amount),
         dueOn: String(values.dueOn),
         category: String(values.category).trim() || null,
+        notes: withPaymentMeta(p.notes, {
+          cadence: String(values.cadence),
+          anchorDate: String(values.dueOn),
+        }),
       });
       payments.reload();
     } catch (e) {
@@ -357,17 +511,29 @@ export default function Finance() {
 
   async function addManualPayment() {
     const values = await dialog.form({
-      title: "Einmalige Zahlung anlegen",
+      title: "Zahlung anlegen",
       fields: [
         { key: "title", label: "Titel" },
         { key: "amount", label: "Betrag", type: "number" },
         { key: "dueOn", label: "Fällig am", type: "date" },
+        {
+          key: "cadence",
+          label: "Turnus",
+          type: "select",
+          options: [
+            { value: "onetime", label: "einmalig" },
+            { value: "monthly", label: "monthly" },
+            { value: "quarterly", label: "quarterly" },
+            { value: "yearly", label: "yearly" },
+          ],
+        },
         { key: "category", label: "Kategorie" },
       ],
       initial: {
         title: "",
         amount: "",
         dueOn: today(),
+        cadence: "onetime",
         category: "",
       },
       submitText: "Anlegen",
@@ -386,6 +552,10 @@ export default function Finance() {
         category: String(values.category).trim() || null,
         currency: "EUR",
         isPaid: false,
+        notes: withPaymentMeta(null, {
+          cadence: String(values.cadence),
+          anchorDate: String(values.dueOn),
+        }),
       });
       payments.reload();
     } catch (e) {
@@ -395,6 +565,37 @@ export default function Finance() {
 
   async function markProjectedPaid(item: UpcomingItem) {
     try {
+      const cadence = item.cadence ?? "onetime";
+      if (cadence === "monthly" || cadence === "quarterly" || cadence === "yearly") {
+        let nextDue = addCadence(item.dueOn, cadence);
+        while (nextDue <= today()) {
+          nextDue = addCadence(nextDue, cadence);
+        }
+
+        const hasNext = (payments.data ?? []).some((p) =>
+          !p.isPaid &&
+          p.title === item.title &&
+          (p.category ?? "") === (item.category ?? "") &&
+          p.dueOn === nextDue &&
+          Math.abs(p.amount - item.amount) < 0.005,
+        );
+
+        if (!hasNext) {
+          await api.post("/api/payments", {
+            title: item.title,
+            amount: item.amount,
+            dueOn: nextDue,
+            category: item.category,
+            currency: item.currency,
+            isPaid: false,
+            notes: withPaymentMeta(null, {
+              cadence,
+              anchorDate: item.dueOn,
+            }),
+          });
+        }
+      }
+
       await api.post("/api/payments", {
         title: item.title,
         amount: item.amount,
@@ -403,6 +604,10 @@ export default function Finance() {
         currency: item.currency,
         isPaid: true,
         paidOn: today(),
+        notes: withPaymentMeta(null, {
+          cadence: item.cadence ?? "onetime",
+          anchorDate: item.dueOn,
+        }),
       });
       payments.reload();
     } catch (e) {
@@ -561,27 +766,30 @@ export default function Finance() {
             { value: "onetime", label: "onetime" },
           ],
         },
-        { key: "dayOfMonth", label: "Zahltag (1-31, optional)", type: "number" },
+        { key: "billingDate", label: "Zahlungsdatum", type: "date" },
         { key: "category", label: "Kategorie", type: "select", options: categoryOptions(c.category) },
       ],
       initial: {
         name: c.name,
         amount: String(c.amount),
         cadence: c.cadence,
-        dayOfMonth: c.dayOfMonth ? String(c.dayOfMonth) : "",
+        billingDate: parseFixedCostMeta(c.notes).billingDate ?? nextDateForDay(c.dayOfMonth ?? 1),
         category: c.category ?? "",
       },
     });
     if (!values) return;
 
     try {
+      const billingDate = String(values.billingDate ?? "").trim() || null;
+      const safeDay = billingDate ? parseIsoDate(billingDate).getDate() : parseOptionalDay(c.dayOfMonth);
       await api.put(`/api/fixed-costs/${c.id}`, {
         ...c,
         name: String(values.name).trim(),
         amount: parseNumber(values.amount),
         cadence: String(values.cadence),
-        dayOfMonth: parseOptionalDay(values.dayOfMonth),
+        dayOfMonth: safeDay,
         category: String(values.category).trim() || null,
+        notes: withFixedCostMeta(c.notes, { billingDate }),
       });
       costs.reload();
     } catch (e) {
@@ -696,7 +904,7 @@ export default function Finance() {
             { value: "onetime", label: "onetime" },
           ],
         },
-        { key: "dayOfMonth", label: "Zahltag (1-31, nur Fixkosten)", type: "number" },
+        { key: "billingDate", label: "Zahlungsdatum (nur Fixkosten)", type: "date" },
         { key: "renewsOn", label: "Fälligkeitsdatum (Abo/Vertrag)", type: "date" },
         { key: "cancelByOn", label: "Kündigen bis (Abo/Vertrag)", type: "date" },
         { key: "category", label: "Kategorie", type: "select", options: categoryOptions("sonstiges") },
@@ -706,7 +914,7 @@ export default function Finance() {
         name: "",
         amount: "",
         cadence: "monthly",
-        dayOfMonth: "",
+        billingDate: today(),
         renewsOn: today(),
         cancelByOn: "",
         category: "",
@@ -722,6 +930,7 @@ export default function Finance() {
     const category = String(values.category).trim() || null;
     if (!name || !Number.isFinite(amount) || amount <= 0) return;
 
+    const billingDate = String(values.billingDate ?? "").trim() || null;
     try {
       if (kind === "subscription") {
         await api.post("/api/subscriptions", {
@@ -739,10 +948,11 @@ export default function Finance() {
           name,
           amount,
           cadence,
-          dayOfMonth: parseOptionalDay(values.dayOfMonth),
+          dayOfMonth: billingDate ? parseIsoDate(billingDate).getDate() : null,
           category,
           currency: "EUR",
           isActive: true,
+          notes: withFixedCostMeta(null, { billingDate }),
         });
       }
       costs.reload();
@@ -807,7 +1017,11 @@ export default function Finance() {
                         </td>
                         <td className="hide-phone">
                           <span className="badge">
-                            {item.source === "payment" ? "einmalig" : item.source === "fixed" ? "Fixkosten" : "Abo/Vertrag"}
+                            {item.source === "payment"
+                              ? (cadenceLabel[parsePaymentMeta(item.payment?.notes, item.dueOn).cadence] ?? "einmalig")
+                              : item.source === "fixed"
+                                ? `Fixkosten · ${cadenceLabel[item.cadence ?? "monthly"] ?? item.cadence}`
+                                : `Abo/Vertrag · ${cadenceLabel[item.cadence ?? "monthly"] ?? item.cadence}`}
                           </span>
                         </td>
                         <td>
@@ -908,6 +1122,7 @@ export default function Finance() {
               <tbody>
                 {costLines.map((line) => {
                   const cancel = daysUntil(line.cancelByOn);
+                  const fixedMeta = line.source === "fixed" ? parseFixedCostMeta(costById.get(line.id)?.notes) : null;
                   return (
                     <tr key={line.key}>
                       <td>
@@ -917,7 +1132,12 @@ export default function Finance() {
                       <td>{cadenceLabel[line.cadence] ?? line.cadence}</td>
                       <td className="hide-phone">
                         {line.source === "fixed"
-                          ? (line.dayOfMonth ? `jeden ${line.dayOfMonth}.` : "kein Zahltag")
+                          ? (() => {
+                            const anchor = fixedMeta?.billingDate;
+                            if (!anchor || !line.dayOfMonth) return "kein Zahltag";
+                            const label = cadenceLabel[line.cadence] ?? line.cadence;
+                            return `${shortDate(anchor)} · ${label}`;
+                          })()
                           : (line.cancelByOn ? `kündigen bis ${shortDate(line.cancelByOn)} (${countdown(cancel)})` : `fällig am ${shortDate(line.renewsOn)}`)}
                       </td>
                       <td className="num">{euro(monthly(line.amount, line.cadence), line.currency)}</td>
