@@ -8,6 +8,7 @@ const links = [
   { to: "/family", label: "Familie", icon: "fa-solid fa-people-group" },
   { to: "/authorities", label: "Behörden", icon: "fa-solid fa-building-shield" },
   { to: "/finance", label: "Finanzen", icon: "fa-solid fa-wallet" },
+  { to: "/wishlist", label: "Wunschliste", icon: "fa-solid fa-gift" },
   { to: "/travel", label: "Reisen", icon: "fa-solid fa-plane-departure" },
   { to: "/documents", label: "Dokumente", icon: "fa-solid fa-folder-open" },
   { to: "/tasks", label: "Aufgaben", icon: "fa-solid fa-list-check" },

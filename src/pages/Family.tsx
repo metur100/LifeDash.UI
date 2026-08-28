@@ -9,9 +9,16 @@ import { useAsync } from "../lib/useAsync";
 type PersonMeta = {
   heightCm: string;
   weightKg: string;
-  bloodType: string;
   allergies: string;
   medication: string;
+  birthPlace: string;
+  taxId: string;
+  identificationNo: string;
+  pensionNo: string;
+  healthInsurance: string;
+  healthInsuranceNo: string;
+  address: string;
+  iban: string;
 };
 
 const META_START = "[profile-meta]";
@@ -21,9 +28,16 @@ function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
   const empty: PersonMeta = {
     heightCm: "",
     weightKg: "",
-    bloodType: "",
     allergies: "",
     medication: "",
+    birthPlace: "",
+    taxId: "",
+    identificationNo: "",
+    pensionNo: "",
+    healthInsurance: "",
+    healthInsuranceNo: "",
+    address: "",
+    iban: "",
   };
   const text = notes ?? "";
   const start = text.indexOf(META_START);
@@ -44,9 +58,16 @@ function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
     meta: {
       heightCm: kv.get("heightCm") ?? "",
       weightKg: kv.get("weightKg") ?? "",
-      bloodType: kv.get("bloodType") ?? "",
       allergies: kv.get("allergies") ?? "",
       medication: kv.get("medication") ?? "",
+      birthPlace: kv.get("birthPlace") ?? "",
+      taxId: kv.get("taxId") ?? "",
+      identificationNo: kv.get("identificationNo") ?? "",
+      pensionNo: kv.get("pensionNo") ?? "",
+      healthInsurance: kv.get("healthInsurance") ?? "",
+      healthInsuranceNo: kv.get("healthInsuranceNo") ?? "",
+      address: kv.get("address") ?? "",
+      iban: kv.get("iban") ?? "",
     },
   };
 }
@@ -55,9 +76,16 @@ function buildPersonNotes(meta: PersonMeta): string | null {
   const lines = [
     `heightCm:${meta.heightCm.trim()}`,
     `weightKg:${meta.weightKg.trim()}`,
-    `bloodType:${meta.bloodType.trim()}`,
     `allergies:${meta.allergies.trim()}`,
     `medication:${meta.medication.trim()}`,
+    `birthPlace:${meta.birthPlace.trim()}`,
+    `taxId:${meta.taxId.trim()}`,
+    `identificationNo:${meta.identificationNo.trim()}`,
+    `pensionNo:${meta.pensionNo.trim()}`,
+    `healthInsurance:${meta.healthInsurance.trim()}`,
+    `healthInsuranceNo:${meta.healthInsuranceNo.trim()}`,
+    `address:${meta.address.trim()}`,
+    `iban:${meta.iban.trim()}`,
   ];
   const hasAnyMeta = lines.some((x) => x.split(":")[1]?.trim());
   if (!hasAnyMeta) return null;
@@ -206,6 +234,8 @@ export default function Family() {
   const dates = useAsync<ImportantDate[]>(() => api.get("/api/important-dates"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
+  const [detailsMember, setDetailsMember] = useState<FamilyMember | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [monthCursor, setMonthCursor] = useState(() => monthStartDate(new Date()));
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [onlyTomorrowWindow, setOnlyTomorrowWindow] = useState(false);
@@ -234,28 +264,37 @@ export default function Family() {
       submitText: "Anlegen",
       fields: [
         { key: "fullName", label: "Name" },
-        { key: "relation", label: "Rolle", type: "select", options: [
-          { value: "self", label: "ich" },
-          { value: "spouse", label: "Partner:in" },
-          { value: "child", label: "Kind" },
-          { value: "other", label: "sonstige" },
-        ] },
+        { key: "relation", label: "Rolle" },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
+        { key: "birthPlace", label: "Geburtsort" },
+        { key: "taxId", label: "Steuer-ID" },
+        { key: "identificationNo", label: "Identifikationsnummer" },
+        { key: "pensionNo", label: "Rentenversicherungsnummer" },
+        { key: "healthInsurance", label: "Krankenversicherung" },
+        { key: "healthInsuranceNo", label: "Versicherungsnummer" },
+        { key: "address", label: "Anschrift" },
+        { key: "iban", label: "IBAN" },
         { key: "heightCm", label: "Größe (cm)", type: "number" },
         { key: "weightKg", label: "Gewicht (kg)", type: "number" },
-        { key: "bloodType", label: "Blutgruppe" },
         { key: "allergies", label: "Allergien" },
         { key: "medication", label: "Medikamente" },
       ],
       initial: {
         fullName: "",
-        relation: "self",
+        relation: "",
         birthDate: "",
         nationality: "",
+        birthPlace: "",
+        taxId: "",
+        identificationNo: "",
+        pensionNo: "",
+        healthInsurance: "",
+        healthInsuranceNo: "",
+        address: "",
+        iban: "",
         heightCm: "",
         weightKg: "",
-        bloodType: "",
         allergies: "",
         medication: "",
       },
@@ -267,9 +306,16 @@ export default function Family() {
       const notes = buildPersonNotes({
         heightCm: String(values.heightCm ?? ""),
         weightKg: String(values.weightKg ?? ""),
-        bloodType: String(values.bloodType ?? ""),
         allergies: String(values.allergies ?? ""),
         medication: String(values.medication ?? ""),
+        birthPlace: String(values.birthPlace ?? ""),
+        taxId: String(values.taxId ?? ""),
+        identificationNo: String(values.identificationNo ?? ""),
+        pensionNo: String(values.pensionNo ?? ""),
+        healthInsurance: String(values.healthInsurance ?? ""),
+        healthInsuranceNo: String(values.healthInsuranceNo ?? ""),
+        address: String(values.address ?? ""),
+        iban: String(values.iban ?? ""),
       });
 
       await api.post("/api/family-members", {
@@ -303,18 +349,19 @@ export default function Family() {
       title: "Person bearbeiten",
       fields: [
         { key: "fullName", label: "Name" },
-        { key: "relation", label: "Rolle", type: "select", options: [
-          { value: "", label: "-" },
-          { value: "self", label: "ich" },
-          { value: "spouse", label: "Partner:in" },
-          { value: "child", label: "Kind" },
-          { value: "other", label: "sonstige" },
-        ] },
+        { key: "relation", label: "Rolle" },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
+        { key: "birthPlace", label: "Geburtsort" },
+        { key: "taxId", label: "Steuer-ID" },
+        { key: "identificationNo", label: "Identifikationsnummer" },
+        { key: "pensionNo", label: "Rentenversicherungsnummer" },
+        { key: "healthInsurance", label: "Krankenversicherung" },
+        { key: "healthInsuranceNo", label: "Versicherungsnummer" },
+        { key: "address", label: "Anschrift" },
+        { key: "iban", label: "IBAN" },
         { key: "heightCm", label: "Größe (cm)", type: "number" },
         { key: "weightKg", label: "Gewicht (kg)", type: "number" },
-        { key: "bloodType", label: "Blutgruppe" },
         { key: "allergies", label: "Allergien" },
         { key: "medication", label: "Medikamente" },
       ],
@@ -323,9 +370,16 @@ export default function Family() {
         relation: m.relation ?? "",
         birthDate: m.birthDate ?? "",
         nationality: m.nationality ?? "",
+        birthPlace: parsed.meta.birthPlace,
+        taxId: parsed.meta.taxId,
+        identificationNo: parsed.meta.identificationNo,
+        pensionNo: parsed.meta.pensionNo,
+        healthInsurance: parsed.meta.healthInsurance,
+        healthInsuranceNo: parsed.meta.healthInsuranceNo,
+        address: parsed.meta.address,
+        iban: parsed.meta.iban,
         heightCm: parsed.meta.heightCm,
         weightKg: parsed.meta.weightKg,
-        bloodType: parsed.meta.bloodType,
         allergies: parsed.meta.allergies,
         medication: parsed.meta.medication,
       },
@@ -336,9 +390,16 @@ export default function Family() {
       const notes = buildPersonNotes({
         heightCm: String(values.heightCm ?? ""),
         weightKg: String(values.weightKg ?? ""),
-        bloodType: String(values.bloodType ?? ""),
         allergies: String(values.allergies ?? ""),
         medication: String(values.medication ?? ""),
+        birthPlace: String(values.birthPlace ?? ""),
+        taxId: String(values.taxId ?? ""),
+        identificationNo: String(values.identificationNo ?? ""),
+        pensionNo: String(values.pensionNo ?? ""),
+        healthInsurance: String(values.healthInsurance ?? ""),
+        healthInsuranceNo: String(values.healthInsuranceNo ?? ""),
+        address: String(values.address ?? ""),
+        iban: String(values.iban ?? ""),
       });
 
       await api.put(`/api/family-members/${m.id}`, {
@@ -661,6 +722,19 @@ export default function Family() {
     return `${shortDate(dateIso(s))} - ${shortDate(dateIso(e))}`;
   }, [monthCursor]);
 
+  async function copyValue(field: string, value: string) {
+    if (!value.trim()) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      window.setTimeout(() => {
+        setCopiedField((prev) => (prev === field ? null : prev));
+      }, 1400);
+    } catch {
+      setError("Kopieren nicht möglich.");
+    }
+  }
+
   return (
     <>
       <PageHead eyebrow="Familie" title="Wer wann was braucht"
@@ -670,27 +744,27 @@ export default function Family() {
       <Section title="Personen" action={<button className="btn icon-only" aria-label="Person hinzufügen" title="Person hinzufügen" onClick={addMember}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Person hinzufügen</span></button>}>
         <div className="card">
           <table>
-            <thead><tr><th>Name</th><th>Rolle</th><th>Geburtstag</th><th>Staatsangehörigkeit</th><th className="num action-col">Aktion</th></tr></thead>
+            <thead><tr><th>Name</th><th>Rolle</th><th>Datum</th><th className="num action-col">Aktion</th></tr></thead>
             <tbody>
               {(members.data ?? []).map((m) => (
                 <tr key={m.id}>
-                  <td>
-                    <strong>{m.fullName}</strong>
-                    {(() => {
-                      const parsed = parsePersonMeta(m.notes);
-                      const meta: string[] = [];
-                      if (parsed.meta.heightCm) meta.push(`${parsed.meta.heightCm} cm`);
-                      if (parsed.meta.weightKg) meta.push(`${parsed.meta.weightKg} kg`);
-                      if (parsed.meta.bloodType) meta.push(`Blutgruppe ${parsed.meta.bloodType}`);
-                      if (parsed.meta.allergies) meta.push(`Allergien: ${parsed.meta.allergies}`);
-                      return meta.length > 0 ? <div className="alert-msg">{meta.join(" · ")}</div> : null;
-                    })()}
-                  </td>
+                  <td><strong>{m.fullName}</strong></td>
                   <td>{m.relation ?? "—"}</td>
                   <td>{shortDate(m.birthDate)}</td>
-                  <td>{m.nationality ?? "—"}</td>
                   <td className="num action-cell">
                     <div className="action-stack">
+                    <button
+                      className="btn ghost small icon-only"
+                      aria-label="Personendetails"
+                      title="Personendetails"
+                      onClick={() => {
+                        setCopiedField(null);
+                        setDetailsMember(m);
+                      }}
+                    >
+                      <i className="fa-solid fa-circle-info" aria-hidden />
+                      <span className="sr-only">Personendetails</span>
+                    </button>{" "}
                     <button className="btn ghost small icon-only" aria-label="Person bearbeiten" title="Person bearbeiten" onClick={() => editMember(m)}>
                       <i className="fa-solid fa-pen-to-square" aria-hidden />
                       <span className="sr-only">Bearbeiten</span>
@@ -926,6 +1000,63 @@ export default function Family() {
               </table>
             </div>}
       </Section>
+
+      {detailsMember && (
+        <div className="dlg-backdrop" role="presentation" onClick={() => setDetailsMember(null)}>
+          <div className="dlg" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="dlg-head">
+              <h3>Personendetails</h3>
+            </div>
+            {copiedField && <div className="badge green" style={{ marginBottom: 8 }}>{copiedField} kopiert</div>}
+            <div className="form-grid person-details-grid" style={{ marginBottom: 10 }}>
+              {(() => {
+                const meta = parsePersonMeta(detailsMember.notes).meta;
+                const rows = [
+                  ["Name", detailsMember.fullName],
+                  ["Rolle", detailsMember.relation ?? ""],
+                  ["Geburtsdatum", detailsMember.birthDate ?? ""],
+                  ["Geburtsort", meta.birthPlace],
+                  ["Staatsangehörigkeit", detailsMember.nationality ?? ""],
+                  ["Steuer-ID", meta.taxId],
+                  ["Identifikationsnummer", meta.identificationNo],
+                  ["Rentenversicherungsnummer", meta.pensionNo],
+                  ["Krankenversicherung", meta.healthInsurance],
+                  ["Versicherungsnummer", meta.healthInsuranceNo],
+                  ["Anschrift", meta.address],
+                  ["IBAN", meta.iban],
+                  ["Größe (cm)", meta.heightCm],
+                  ["Gewicht (kg)", meta.weightKg],
+                  ["Allergien", meta.allergies],
+                  ["Medikamente", meta.medication],
+                ] as Array<[string, string]>;
+
+                return rows.map(([label, value]) => {
+                  const copied = copiedField === label;
+                  return (
+                    <div key={label} className="person-detail-row">
+                      <div className="person-detail-label">{label}</div>
+                      <div className="person-detail-value" title={value || ""}>{value || "—"}</div>
+                      <button
+                        className="btn ghost small icon-only"
+                        onClick={() => { void copyValue(label, value); }}
+                        disabled={!value}
+                        aria-label={copied ? `${label} kopiert` : `${label} kopieren`}
+                        title={copied ? "Kopiert" : "Kopieren"}
+                      >
+                        <i className={`fa-solid ${copied ? "fa-check" : "fa-copy"}`} aria-hidden />
+                        <span className="sr-only">{copied ? "Kopiert" : "Kopieren"}</span>
+                      </button>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+            <div className="dlg-actions">
+              <button className="btn" onClick={() => setDetailsMember(null)}>Schließen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

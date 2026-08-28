@@ -12,6 +12,7 @@ import Tasks from "./pages/Tasks";
 import Travel from "./pages/Travel";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import WishList from "./pages/WishList";
 
 export default function App() {
   const { session, ready } = useAuth();
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="authorities" element={<Authorities />} />
           <Route path="authorities/:id" element={<Authorities />} />
           <Route path="finance" element={<Finance />} />
+          <Route path="wishlist" element={<WishList />} />
           <Route path="travel" element={<Travel />} />
           <Route path="travel/:id" element={<Travel />} />
           <Route path="documents" element={<Documents />} />
