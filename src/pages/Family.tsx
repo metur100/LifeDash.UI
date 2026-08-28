@@ -27,6 +27,8 @@ type PersonMeta = {
 
 const META_START = "[profile-meta]";
 const META_END = "[/profile-meta]";
+const IMPORTANT_META_START = "[important-meta]";
+const IMPORTANT_META_END = "[/important-meta]";
 
 function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
   const empty: PersonMeta = {
@@ -166,6 +168,79 @@ function plusOneDay(iso: string): string {
   return dateIso(d);
 }
 
+function parseMetaBlock(notes: string | null | undefined, startTag: string, endTag: string) {
+  const text = notes ?? "";
+  const start = text.indexOf(startTag);
+  const end = text.indexOf(endTag);
+  if (start < 0 || end < 0 || end <= start) return new Map<string, string>();
+
+  const raw = text.slice(start + startTag.length, end).trim();
+  const values = new Map<string, string>();
+  for (const line of raw.split("\n").map((x) => x.trim()).filter(Boolean)) {
+    const idx = line.indexOf(":");
+    if (idx <= 0) continue;
+    values.set(line.slice(0, idx).trim(), line.slice(idx + 1).trim());
+  }
+  return values;
+}
+
+function writeMetaBlock(notes: string | null | undefined, startTag: string, endTag: string, entries: Array<[string, string | null]>) {
+  const text = notes ?? "";
+  const start = text.indexOf(startTag);
+  const end = text.indexOf(endTag);
+
+  const lines = entries
+    .filter(([, value]) => !!value)
+    .map(([key, value]) => `${key}:${String(value)}`);
+  const block = lines.length > 0 ? `${startTag}\n${lines.join("\n")}\n${endTag}` : "";
+
+  if (start < 0 || end < 0 || end <= start) {
+    if (!block) return text.trim() || null;
+    return text.trim() ? `${text.trim()}\n\n${block}` : block;
+  }
+
+  const before = text.slice(0, start).trim();
+  const after = text.slice(end + endTag.length).trim();
+  const plain = [before, after].filter(Boolean).join("\n\n").trim();
+  if (!block) return plain || null;
+  return plain ? `${plain}\n\n${block}` : block;
+}
+
+type ImportantCadence = "monthly" | "quarterly" | "semiannual" | "yearly";
+
+function importantCadence(d: ImportantDate): ImportantCadence {
+  const values = parseMetaBlock(d.notes, IMPORTANT_META_START, IMPORTANT_META_END);
+  const raw = (values.get("cadence") ?? "").toLowerCase();
+  if (raw === "monthly" || raw === "quarterly" || raw === "semiannual" || raw === "yearly") return raw;
+  return "yearly";
+}
+
+function withImportantCadence(notes: string | null | undefined, cadence: ImportantCadence): string | null {
+  return writeMetaBlock(notes, IMPORTANT_META_START, IMPORTANT_META_END, [
+    ["cadence", cadence],
+  ]);
+}
+
+function cadenceMonths(cadence: ImportantCadence): number {
+  if (cadence === "monthly") return 1;
+  if (cadence === "quarterly") return 3;
+  if (cadence === "semiannual") return 6;
+  return 12;
+}
+
+function addMonthsClamped(base: Date, months: number): Date {
+  const y = base.getFullYear();
+  const m = base.getMonth();
+  const day = base.getDate();
+  const first = new Date(y, m + months, 1);
+  const lastDay = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  return new Date(first.getFullYear(), first.getMonth(), Math.min(day, lastDay));
+}
+
+function monthsBetween(a: Date, b: Date): number {
+  return (a.getFullYear() - b.getFullYear()) * 12 + (a.getMonth() - b.getMonth());
+}
+
 const APPOINTMENT_CATEGORIES = [
   { value: "family", label: "Familie" },
   { value: "birthday", label: "Geburtstag" },
@@ -205,33 +280,38 @@ function normalizeCategory(category?: string | null): string {
 }
 
 function nextImportantOccurrence(d: ImportantDate, fromIso = today()): string {
-  if (!d.repeatsYearly) return d.dateValue;
+  const cadence = importantCadence(d);
+  const anchor = new Date(`${d.dateValue}T00:00:00`);
+  if (Number.isNaN(anchor.getTime())) return d.dateValue;
 
-  const [y, m, day] = d.dateValue.split("-").map(Number);
-  if (!y || !m || !day) return d.dateValue;
+  const from = new Date(`${fromIso}T00:00:00`);
+  const step = cadenceMonths(cadence);
 
-  const [fromYear] = fromIso.split("-").map(Number);
-  const safeDayThisYear = Math.min(day, new Date(fromYear, m, 0).getDate());
-  const thisYearIso = dateIso(new Date(fromYear, m - 1, safeDayThisYear));
-  if (thisYearIso >= fromIso) return thisYearIso;
+  if (anchor >= from) return dateIso(anchor);
 
-  const nextYear = fromYear + 1;
-  const safeDayNextYear = Math.min(day, new Date(nextYear, m, 0).getDate());
-  return dateIso(new Date(nextYear, m - 1, safeDayNextYear));
+  let candidate = new Date(anchor);
+  let guard = 0;
+  while (candidate < from && guard < 600) {
+    candidate = addMonthsClamped(candidate, step);
+    guard += 1;
+  }
+  return dateIso(candidate);
 }
 
 function occurrenceInMonth(d: ImportantDate, cursor: Date): string | null {
+  const cadence = importantCadence(d);
   const month = cursor.getMonth() + 1;
   const year = cursor.getFullYear();
 
   const [rawYear, rawMonth, rawDay] = d.dateValue.split("-").map(Number);
   if (!rawYear || !rawMonth || !rawDay) return null;
 
-  if (!d.repeatsYearly) {
-    return rawYear === year && rawMonth === month ? d.dateValue : null;
-  }
+  const anchor = new Date(rawYear, rawMonth - 1, rawDay);
+  const target = new Date(year, month - 1, 1);
+  const deltaMonths = monthsBetween(target, anchor);
+  if (deltaMonths < 0) return null;
+  if (deltaMonths % cadenceMonths(cadence) !== 0) return null;
 
-  if (rawMonth !== month) return null;
   const safeDay = Math.min(rawDay, new Date(year, month, 0).getDate());
   return dateIso(new Date(year, month - 1, safeDay));
 }
@@ -248,10 +328,18 @@ function appointmentTooltip(a: Appointment, memberNameById: Map<number, string>)
 }
 
 function importantDateTooltip(d: ImportantDate, occurrenceIso: string): string {
+  const cadence = importantCadence(d);
+  const cadenceLabel = cadence === "monthly"
+    ? "monatlich"
+    : cadence === "quarterly"
+      ? "quartalsweise"
+      : cadence === "semiannual"
+        ? "alle 6 Monate"
+        : "jaehrlich";
   const lines = [
     d.title,
     `Datum: ${shortDate(occurrenceIso)}`,
-    `Wiederholung: ${d.repeatsYearly ? "jaehrlich" : "einmalig"}`,
+    `Wiederholung: ${cadenceLabel}`,
   ];
   return lines.join("\n");
 }
@@ -553,29 +641,33 @@ export default function Family() {
         { key: "title", label: "Anlass" },
         { key: "dateValue", label: "Datum", type: "date" },
         {
-          key: "repeatsYearly",
+          key: "cadence",
           label: "Wiederholung",
           type: "select",
           options: [
-            { value: "true", label: "jährlich" },
-            { value: "false", label: "einmalig" },
+            { value: "monthly", label: "monatlich" },
+            { value: "quarterly", label: "quartalsweise" },
+            { value: "semiannual", label: "alle 6 Monate" },
+            { value: "yearly", label: "jährlich" },
           ],
         },
       ],
       initial: {
         title: d.title,
         dateValue: d.dateValue,
-        repeatsYearly: d.repeatsYearly ? "true" : "false",
+        cadence: importantCadence(d),
       },
     });
     if (!values) return;
 
     try {
+      const cadence = String(values.cadence) as ImportantCadence;
       await api.put(`/api/important-dates/${d.id}`, {
         ...d,
         title: String(values.title).trim(),
         dateValue: String(values.dateValue),
-        repeatsYearly: String(values.repeatsYearly) === "true",
+        repeatsYearly: true,
+        notes: withImportantCadence(d.notes, cadence),
       });
       dates.reload();
     } catch (e) { setError((e as Error).message); }
@@ -681,25 +773,29 @@ export default function Family() {
       fields: [
         { key: "title", label: "Anlass" },
         { key: "dateValue", label: "Datum", type: "date" },
-        { key: "repeatsYearly", label: "Wiederholung", type: "select", options: [
-          { value: "true", label: "jährlich" },
-          { value: "false", label: "einmalig" },
+        { key: "cadence", label: "Wiederholung", type: "select", options: [
+          { value: "monthly", label: "monatlich" },
+          { value: "quarterly", label: "quartalsweise" },
+          { value: "semiannual", label: "alle 6 Monate" },
+          { value: "yearly", label: "jährlich" },
         ] },
       ],
       initial: {
         title: "",
         dateValue: today(),
-        repeatsYearly: "true",
+        cadence: "yearly",
       },
     });
     if (!values) return;
     if (!String(values.title).trim() || !String(values.dateValue).trim()) return;
 
     try {
+      const cadence = String(values.cadence) as ImportantCadence;
       await api.post("/api/important-dates", {
         title: String(values.title).trim(),
         dateValue: String(values.dateValue),
-        repeatsYearly: String(values.repeatsYearly) === "true",
+        repeatsYearly: true,
+        notes: withImportantCadence(null, cadence),
         reminderDays: 14,
       });
       dates.reload();
@@ -1031,9 +1127,9 @@ export default function Family() {
         </Section>
       </div>
 
-      <Section title="Wichtige Daten" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
+      <Section title="Wiederholende Termine" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
         {(dates.data ?? []).length === 0
-          ? <Empty title="Noch keine wichtigen Daten." hint="Geburtstage und Jahrestage erinnern dich rechtzeitig." />
+          ? <Empty title="Noch keine wiederholenden Termine." hint="Monatliche und jährliche Erinnerungen erscheinen hier." />
           : <div className="card">
               <table>
                 <thead><tr><th>Anlass</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
@@ -1042,7 +1138,7 @@ export default function Family() {
                     <tr key={d.id}>
                       <td><strong>{d.title}</strong></td>
                       <td>{shortDate(d.dateValue)}</td>
-                      <td>{d.repeatsYearly ? "jährlich" : "einmalig"}</td>
+                      <td>{importantCadence(d) === "monthly" ? "monatlich" : importantCadence(d) === "quarterly" ? "quartalsweise" : importantCadence(d) === "semiannual" ? "alle 6 Monate" : "jährlich"}</td>
                       <td className="num">{countdown(daysUntil(nextImportantOccurrence(d)))}</td>
                       <td className="num action-cell">
                         <div className="action-stack">
