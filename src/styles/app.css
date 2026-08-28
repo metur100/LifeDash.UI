@@ -711,8 +711,26 @@ textarea { min-height: 70px; resize: vertical; }
   display: flex;
   flex-direction: column;
   gap: 4px;
-  cursor: pointer;
+  position: relative;
   transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.calendar-cell-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-add-btn {
+  margin-left: auto;
+}
+
+.calendar-reminder-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d34b58;
+  box-shadow: 0 0 0 2px #ffe8ea;
 }
 
 .family-calendar-cell.has-items {
@@ -726,6 +744,7 @@ textarea { min-height: 70px; resize: vertical; }
 
 .family-calendar-cell .appt {
   display: block;
+  width: 100%;
   font-size: 10px;
   line-height: 1.2;
   color: #173042;
@@ -733,9 +752,34 @@ textarea { min-height: 70px; resize: vertical; }
   padding: 2px 6px;
   border: 1px solid transparent;
   background: #ecf2f8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.appt-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.appt-done-btn {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.appt-done-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .family-calendar-cell .appt.more {
@@ -744,6 +788,7 @@ textarea { min-height: 70px; resize: vertical; }
   background: transparent;
   border: 0;
   padding: 0;
+  display: block;
 }
 
 .family-calendar-cell .appt.important-date,
@@ -842,6 +887,10 @@ textarea { min-height: 70px; resize: vertical; }
 [data-theme="dark"] .family-calendar-cell .appt {
   color: #dbe7f3;
   background: #243446;
+}
+
+[data-theme="dark"] .appt-done-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 [data-theme="dark"] .family-calendar-cell .appt.important-date,

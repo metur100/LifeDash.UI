@@ -22,6 +22,8 @@ type FormOptions<T extends Record<string, unknown>> = {
   fields: DialogField[];
   initial: T;
   submitText?: string;
+  secondarySubmitText?: string;
+  secondarySubmitValue?: string;
 };
 
 type DialogApi = {
@@ -39,6 +41,8 @@ type FormState = {
   title: string;
   fields: DialogField[];
   submitText?: string;
+  secondarySubmitText?: string;
+  secondarySubmitValue?: string;
   draft: Record<string, unknown>;
   resolve: (value: Record<string, unknown> | null) => void;
 };
@@ -60,6 +64,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         title: opts.title,
         fields: opts.fields,
         submitText: opts.submitText,
+        secondarySubmitText: opts.secondarySubmitText,
+        secondarySubmitValue: opts.secondarySubmitValue,
         draft: { ...opts.initial },
         resolve: (value) => resolve(value as T | null),
       });
@@ -133,6 +139,18 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                 ))}
                 <div className="dlg-actions">
                   <button type="button" className="btn ghost" onClick={() => closeForm(null)}>Abbrechen</button>
+                  {state.secondarySubmitText && (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => closeForm({
+                        ...state.draft,
+                        __dialogAction: state.secondarySubmitValue ?? "secondary",
+                      })}
+                    >
+                      {state.secondarySubmitText}
+                    </button>
+                  )}
                   <button type="submit" className="btn">{state.submitText ?? "Speichern"}</button>
                 </div>
               </form>

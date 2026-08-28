@@ -83,6 +83,45 @@ function addMonth(d: Date, delta: number) {
   return new Date(d.getFullYear(), d.getMonth() + delta, 1);
 }
 
+function addDaysDate(d: Date, delta: number) {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + delta);
+  return copy;
+}
+
+function startOfWeek(d: Date) {
+  const copy = new Date(d);
+  const offset = (copy.getDay() + 6) % 7;
+  copy.setDate(copy.getDate() - offset);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function toLocalDateTimeInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day}T${hh}:${mm}`;
+}
+
+function fromDateTimeInput(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (raw.length === 16) return `${raw}:00`;
+  return raw;
+}
+
+function plusOneDay(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return dateIso(d);
+}
+
 const APPOINTMENT_CATEGORIES = [
   { value: "family", label: "Familie" },
   { value: "birthday", label: "Geburtstag" },
@@ -141,6 +180,26 @@ function occurrenceInMonth(d: ImportantDate, cursor: Date): string | null {
   return dateIso(new Date(year, month - 1, safeDay));
 }
 
+function appointmentTooltip(a: Appointment, memberNameById: Map<number, string>): string {
+  const lines = [
+    a.title,
+    `Kategorie: ${categoryLabel(a.category)}`,
+    `Zeit: ${dateTime(a.startsAt)}`,
+  ];
+  if (a.location) lines.push(`Ort: ${a.location}`);
+  if (a.familyMemberId) lines.push(`Person: ${memberNameById.get(a.familyMemberId) ?? "Person"}`);
+  return lines.join("\n");
+}
+
+function importantDateTooltip(d: ImportantDate, occurrenceIso: string): string {
+  const lines = [
+    d.title,
+    `Datum: ${shortDate(occurrenceIso)}`,
+    `Wiederholung: ${d.repeatsYearly ? "jaehrlich" : "einmalig"}`,
+  ];
+  return lines.join("\n");
+}
+
 export default function Family() {
   const members = useAsync<FamilyMember[]>(() => api.get("/api/family-members"), []);
   const appts = useAsync<Appointment[]>(() => api.get("/api/appointments"), []);
@@ -148,6 +207,26 @@ export default function Family() {
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
   const [monthCursor, setMonthCursor] = useState(() => monthStartDate(new Date()));
+  const [calendarView, setCalendarView] = useState<"month" | "week">("month");
+  const [onlyTomorrowWindow, setOnlyTomorrowWindow] = useState(false);
+  const [visibleCategories, setVisibleCategories] = useState<string[]>(() => APPOINTMENT_CATEGORIES.map((x) => x.value));
+
+  const todayIso = today();
+  const tomorrowIso = plusOneDay(todayIso);
+
+  function categoryVisible(category?: string | null) {
+    return visibleCategories.includes(normalizeCategory(category));
+  }
+
+  function inTomorrowWindow(iso: string) {
+    return iso === todayIso || iso === tomorrowIso;
+  }
+
+  function toggleCategory(category: string) {
+    setVisibleCategories((prev) => prev.includes(category)
+      ? prev.filter((x) => x !== category)
+      : [...prev, category]);
+  }
 
   async function addMember() {
     const values = await dialog.form({
@@ -291,6 +370,9 @@ export default function Family() {
 
     const values = await dialog.form({
       title: "Termin bearbeiten",
+      submitText: "Speichern",
+      secondarySubmitText: "Duplizieren",
+      secondarySubmitValue: "duplicate",
       fields: [
         { key: "title", label: "Termin" },
         { key: "startsAt", label: "Start", type: "datetime-local" },
@@ -300,7 +382,7 @@ export default function Family() {
       ],
       initial: {
         title: a.title,
-        startsAt: a.startsAt.slice(0, 16),
+        startsAt: toLocalDateTimeInput(a.startsAt),
         location: a.location ?? "",
         category: normalizeCategory(a.category),
         familyMemberId: a.familyMemberId ? String(a.familyMemberId) : "",
@@ -309,14 +391,25 @@ export default function Family() {
     if (!values) return;
 
     try {
-      await api.put(`/api/appointments/${a.id}`, {
-        ...a,
+      const payload = {
         title: String(values.title).trim(),
-        startsAt: String(values.startsAt).trim() ? new Date(String(values.startsAt)).toISOString() : a.startsAt,
+        startsAt: fromDateTimeInput(values.startsAt) ?? a.startsAt,
         location: String(values.location).trim() || null,
         category: normalizeCategory(String(values.category)),
         familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
-      });
+        reminderDays: a.reminderDays,
+        isDone: false,
+      };
+
+      const action = String((values as Record<string, unknown>).__dialogAction ?? "");
+      if (action === "duplicate") {
+        await api.post("/api/appointments", payload);
+      } else {
+        await api.put(`/api/appointments/${a.id}`, {
+          ...a,
+          ...payload,
+        });
+      }
       appts.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -404,7 +497,7 @@ export default function Family() {
     try {
       await api.post("/api/appointments", {
         title: String(values.title).trim(),
-        startsAt: new Date(String(values.startsAt)).toISOString(),
+        startsAt: fromDateTimeInput(values.startsAt),
         location: String(values.location).trim() || null,
         category: normalizeCategory(String(values.category)),
         familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
@@ -442,9 +535,7 @@ export default function Family() {
     if (!values) return;
     if (!String(values.title).trim()) return;
 
-    const startsAt = String(values.startsAt).trim()
-      ? new Date(String(values.startsAt)).toISOString()
-      : new Date(`${dayIso}T09:00:00`).toISOString();
+    const startsAt = fromDateTimeInput(values.startsAt) ?? `${dayIso}T09:00:00`;
 
     try {
       await api.post("/api/appointments", {
@@ -494,35 +585,53 @@ export default function Family() {
 
   const upcoming = (appts.data ?? [])
     .filter((a) => !a.isDone)
+    .filter((a) => categoryVisible(a.category))
+    .filter((a) => !onlyTomorrowWindow || inTomorrowWindow(a.startsAt.slice(0, 10)))
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const doneAppointments = (appts.data ?? [])
     .filter((a) => a.isDone)
+    .filter((a) => categoryVisible(a.category))
+    .filter((a) => !onlyTomorrowWindow || inTomorrowWindow(a.startsAt.slice(0, 10)))
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   const memberNameById = new Map((members.data ?? []).map((m) => [m.id, m.fullName]));
   const apptByDay = useMemo(() => {
     const map = new Map<string, Appointment[]>();
-    for (const a of (appts.data ?? []).filter((x) => !x.isDone)) {
+    for (const a of (appts.data ?? []).filter((x) => !x.isDone).filter((x) => categoryVisible(x.category))) {
+      if (onlyTomorrowWindow && !inTomorrowWindow(a.startsAt.slice(0, 10))) continue;
       const day = a.startsAt.slice(0, 10);
       const list = map.get(day) ?? [];
       list.push(a);
       map.set(day, list);
     }
     return map;
-  }, [appts.data]);
+  }, [appts.data, visibleCategories, onlyTomorrowWindow]);
 
   const importantByDay = useMemo(() => {
     const map = new Map<string, ImportantDate[]>();
     for (const d of (dates.data ?? [])) {
       const iso = occurrenceInMonth(d, monthCursor);
       if (!iso) continue;
+      if (onlyTomorrowWindow && !inTomorrowWindow(iso)) continue;
       const list = map.get(iso) ?? [];
       list.push(d);
       map.set(iso, list);
     }
     return map;
-  }, [dates.data, monthCursor]);
+  }, [dates.data, monthCursor, onlyTomorrowWindow]);
 
   const calendarCells = useMemo(() => {
+    if (calendarView === "week") {
+      const weekStart = startOfWeek(monthCursor);
+      return Array.from({ length: 7 }).map((_, idx) => {
+        const d = addDaysDate(weekStart, idx);
+        return {
+          iso: dateIso(d),
+          day: d.getDate(),
+          inMonth: d.getMonth() === monthCursor.getMonth(),
+        };
+      });
+    }
+
     const start = monthStartDate(monthCursor);
     const end = monthEndDate(monthCursor);
     const offset = (start.getDay() + 6) % 7;
@@ -544,6 +653,12 @@ export default function Family() {
       cells.push({ iso: dateIso(d), day: d.getDate(), inMonth: false });
     }
     return cells;
+  }, [monthCursor, calendarView]);
+
+  const weekLabel = useMemo(() => {
+    const s = startOfWeek(monthCursor);
+    const e = addDaysDate(s, 6);
+    return `${shortDate(dateIso(s))} - ${shortDate(dateIso(e))}`;
   }, [monthCursor]);
 
   return (
@@ -598,19 +713,30 @@ export default function Family() {
         <Section title="Termine" action={<button className="btn icon-only" aria-label="Termin anlegen" title="Termin anlegen" onClick={addAppointment}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Termin anlegen</span></button>}>
           <div className="card" style={{ marginBottom: 12 }}>
             <div className="row" style={{ marginBottom: 10 }}>
-              <button className="btn ghost small icon-only" aria-label="Vorheriger Monat" title="Vorheriger Monat" onClick={() => setMonthCursor((m) => addMonth(m, -1))}>
+              <button className="btn ghost small icon-only" aria-label={calendarView === "month" ? "Vorheriger Monat" : "Vorherige Woche"} title={calendarView === "month" ? "Vorheriger Monat" : "Vorherige Woche"} onClick={() => setMonthCursor((m) => calendarView === "month" ? addMonth(m, -1) : addDaysDate(m, -7))}>
                 <i className="fa-solid fa-chevron-left" aria-hidden />
                 <span className="sr-only">Vorheriger Monat</span>
               </button>
               <strong style={{ minWidth: 170, textAlign: "center" }}>
-                {monthCursor.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}
+                {calendarView === "month" ? monthCursor.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : weekLabel}
               </strong>
-              <button className="btn ghost small icon-only" aria-label="Nächster Monat" title="Nächster Monat" onClick={() => setMonthCursor((m) => addMonth(m, 1))}>
+              <button className="btn ghost small icon-only" aria-label={calendarView === "month" ? "Nächster Monat" : "Nächste Woche"} title={calendarView === "month" ? "Nächster Monat" : "Nächste Woche"} onClick={() => setMonthCursor((m) => calendarView === "month" ? addMonth(m, 1) : addDaysDate(m, 7))}>
                 <i className="fa-solid fa-chevron-right" aria-hidden />
                 <span className="sr-only">Nächster Monat</span>
               </button>
               <div className="spacer" />
-              <button className="btn ghost small" onClick={() => setMonthCursor(monthStartDate(new Date()))}>Heute</button>
+              <button className={`chip ${calendarView === "month" ? "on" : ""}`} onClick={() => setCalendarView("month")}>Monat</button>
+              <button className={`chip ${calendarView === "week" ? "on" : ""}`} onClick={() => setCalendarView("week")}>Woche</button>
+              <button className={`chip ${onlyTomorrowWindow ? "on" : ""}`} onClick={() => setOnlyTomorrowWindow((v) => !v)}>Heute + Morgen</button>
+              <button className="btn ghost small" onClick={() => setMonthCursor(new Date())}>Heute</button>
+            </div>
+
+            <div className="filters" style={{ marginBottom: 10 }}>
+              {APPOINTMENT_CATEGORIES.map((c) => (
+                <button key={c.value} className={`chip ${visibleCategories.includes(c.value) ? "on" : ""}`} onClick={() => toggleCategory(c.value)}>
+                  {c.label}
+                </button>
+              ))}
             </div>
 
             <div className="family-calendar">
@@ -628,22 +754,70 @@ export default function Family() {
               {calendarCells.map((cell) => {
                 const items = apptByDay.get(cell.iso) ?? [];
                 const importantItems = importantByDay.get(cell.iso) ?? [];
+                const dayDistance = daysUntil(cell.iso) ?? 999;
+                const hasNearReminder = (items.length + importantItems.length) > 0 && dayDistance >= 0 && dayDistance <= 2;
+                const cellTooltipLines: string[] = [];
+                for (const d of importantItems) {
+                  cellTooltipLines.push(`• ${d.title} (Wichtiges Datum)`);
+                }
+                for (const a of items) {
+                  const when = dateTime(a.startsAt);
+                  const cat = categoryLabel(a.category);
+                  cellTooltipLines.push(`• ${a.title} (${cat}, ${when})`);
+                }
+                const cellTitle = cellTooltipLines.length > 0
+                  ? `${shortDate(cell.iso)}\n${cellTooltipLines.join("\n")}`
+                  : "Termin anlegen";
                 return (
-                  <button
+                  <div
                     key={cell.iso}
                     className={`family-calendar-cell ${cell.inMonth ? "" : "out"} ${(items.length + importantItems.length) > 0 ? "has-items" : ""}`}
-                    onClick={() => addAppointmentAtDate(cell.iso)}
-                    title="Termin anlegen"
+                    title={cellTitle}
                   >
-                    <span className="day">{cell.day}</span>
+                    <div className="calendar-cell-head">
+                      <span className="day">{cell.day}</span>
+                      {hasNearReminder && <span className="calendar-reminder-dot" title="Erinnerung in den nächsten 2 Tagen" />}
+                      <button
+                        className="btn ghost small icon-only calendar-add-btn"
+                        title="Termin anlegen"
+                        aria-label="Termin anlegen"
+                        onClick={() => addAppointmentAtDate(cell.iso)}
+                      >
+                        <i className="fa-solid fa-plus" aria-hidden />
+                        <span className="sr-only">Termin anlegen</span>
+                      </button>
+                    </div>
                     {importantItems.slice(0, 2).map((d) => (
-                      <span key={`imp-${d.id}`} className="appt important-date">{d.title}</span>
+                      <span
+                        key={`imp-${d.id}`}
+                        className="appt important-date"
+                        title={importantDateTooltip(d, cell.iso)}
+                      >
+                        {d.title}
+                      </span>
                     ))}
                     {items.slice(0, 2).map((a) => (
-                      <span key={a.id} className={`appt appt-cat-${normalizeCategory(a.category)}`}>{a.title}</span>
+                      <span
+                        key={a.id}
+                        className={`appt appt-cat-${normalizeCategory(a.category)}`}
+                        title={appointmentTooltip(a, memberNameById)}
+                      >
+                        <span className="appt-title">{a.title}</span>
+                        <button
+                          className="appt-done-btn"
+                          title="Termin als erledigt markieren"
+                          aria-label="Termin als erledigt markieren"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void completeAppointment(a);
+                          }}
+                        >
+                          <i className="fa-solid fa-check" aria-hidden />
+                        </button>
+                      </span>
                     ))}
                     {(importantItems.length + items.length) > 4 && <span className="appt more">+{(importantItems.length + items.length) - 4}</span>}
-                  </button>
+                  </div>
                 );
               })}
             </div>

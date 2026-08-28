@@ -7,6 +7,25 @@ import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { countdown, dateTime, daysUntil, euro, shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
+function toLocalDateTimeInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day}T${hh}:${mm}`;
+}
+
+function fromDateTimeInput(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (raw.length === 16) return `${raw}:00`;
+  return raw;
+}
+
 export default function Travel() {
   const { id } = useParams();
   const trips = useAsync<Trip[]>(() => api.get("/api/trips"), []);
@@ -175,7 +194,7 @@ export default function Travel() {
       initial: {
         title: b.title,
         kind: b.kind,
-        startsAt: b.startsAt?.slice(0, 16) ?? "",
+        startsAt: toLocalDateTimeInput(b.startsAt),
         amount: b.amount?.toString() ?? "",
       },
     });
@@ -186,7 +205,7 @@ export default function Travel() {
         ...b,
         title: String(values.title).trim(),
         kind: String(values.kind),
-        startsAt: String(values.startsAt).trim() ? new Date(String(values.startsAt)).toISOString() : null,
+        startsAt: fromDateTimeInput(values.startsAt),
         amount: String(values.amount).trim() ? Number(values.amount) : null,
       });
       trips.reload();
@@ -238,7 +257,7 @@ export default function Travel() {
       await api.post(`/api/trips/${t.id}/bookings`, {
         title,
         kind: String(values.kind),
-        startsAt: String(values.startsAt).trim() ? new Date(String(values.startsAt)).toISOString() : null,
+        startsAt: fromDateTimeInput(values.startsAt),
         amount: String(values.amount).trim() ? Number(values.amount) : null,
         currency: "EUR",
       });
