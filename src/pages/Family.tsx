@@ -17,6 +17,10 @@ type PersonMeta = {
   pensionNo: string;
   healthInsurance: string;
   healthInsuranceNo: string;
+  idCardNo: string;
+  passportNo: string;
+  passportIssuedOn: string;
+  passportExpiresOn: string;
   address: string;
   iban: string;
 };
@@ -36,6 +40,10 @@ function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
     pensionNo: "",
     healthInsurance: "",
     healthInsuranceNo: "",
+    idCardNo: "",
+    passportNo: "",
+    passportIssuedOn: "",
+    passportExpiresOn: "",
     address: "",
     iban: "",
   };
@@ -66,6 +74,10 @@ function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
       pensionNo: kv.get("pensionNo") ?? "",
       healthInsurance: kv.get("healthInsurance") ?? "",
       healthInsuranceNo: kv.get("healthInsuranceNo") ?? "",
+      idCardNo: kv.get("idCardNo") ?? "",
+      passportNo: kv.get("passportNo") ?? "",
+      passportIssuedOn: kv.get("passportIssuedOn") ?? "",
+      passportExpiresOn: kv.get("passportExpiresOn") ?? "",
       address: kv.get("address") ?? "",
       iban: kv.get("iban") ?? "",
     },
@@ -84,6 +96,10 @@ function buildPersonNotes(meta: PersonMeta): string | null {
     `pensionNo:${meta.pensionNo.trim()}`,
     `healthInsurance:${meta.healthInsurance.trim()}`,
     `healthInsuranceNo:${meta.healthInsuranceNo.trim()}`,
+    `idCardNo:${meta.idCardNo.trim()}`,
+    `passportNo:${meta.passportNo.trim()}`,
+    `passportIssuedOn:${meta.passportIssuedOn.trim()}`,
+    `passportExpiresOn:${meta.passportExpiresOn.trim()}`,
     `address:${meta.address.trim()}`,
     `iban:${meta.iban.trim()}`,
   ];
@@ -162,6 +178,18 @@ const APPOINTMENT_CATEGORIES = [
   { value: "travel", label: "Reise" },
   { value: "home", label: "Haushalt" },
   { value: "other", label: "Sonstiges" },
+];
+
+const PERSON_ROLE_OPTIONS = [
+  { value: "", label: "-" },
+  { value: "Mutter", label: "Mutter" },
+  { value: "Vater", label: "Vater" },
+  { value: "Schwester", label: "Schwester" },
+  { value: "Bruder", label: "Bruder" },
+  { value: "Ehepartner", label: "Ehepartner" },
+  { value: "Sohn", label: "Sohn" },
+  { value: "Tochter", label: "Tochter" },
+  { value: "Sonstige", label: "Sonstige" },
 ];
 
 const categoryLabelByValue = new Map(APPOINTMENT_CATEGORIES.map((x) => [x.value, x.label]));
@@ -263,18 +291,27 @@ export default function Family() {
       title: "Person hinzufügen",
       submitText: "Anlegen",
       fields: [
+        { key: "sec-basic", label: "Basis", type: "section" },
         { key: "fullName", label: "Name" },
-        { key: "relation", label: "Rolle" },
+        { key: "relation", label: "Rolle", type: "select", options: PERSON_ROLE_OPTIONS },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
         { key: "birthPlace", label: "Geburtsort" },
+
+        { key: "sec-docs", label: "Dokumente und Nummern", type: "section" },
         { key: "taxId", label: "Steuer-ID" },
         { key: "identificationNo", label: "Identifikationsnummer" },
         { key: "pensionNo", label: "Rentenversicherungsnummer" },
         { key: "healthInsurance", label: "Krankenversicherung" },
         { key: "healthInsuranceNo", label: "Versicherungsnummer" },
+        { key: "idCardNo", label: "Ausweisnummer" },
+        { key: "passportNo", label: "Passnummer" },
+        { key: "passportIssuedOn", label: "Pass ausgestellt am", type: "date" },
+        { key: "passportExpiresOn", label: "Pass gültig bis", type: "date" },
         { key: "address", label: "Anschrift" },
         { key: "iban", label: "IBAN" },
+
+        { key: "sec-health", label: "Gesundheit", type: "section" },
         { key: "heightCm", label: "Größe (cm)", type: "number" },
         { key: "weightKg", label: "Gewicht (kg)", type: "number" },
         { key: "allergies", label: "Allergien" },
@@ -291,6 +328,10 @@ export default function Family() {
         pensionNo: "",
         healthInsurance: "",
         healthInsuranceNo: "",
+        idCardNo: "",
+        passportNo: "",
+        passportIssuedOn: "",
+        passportExpiresOn: "",
         address: "",
         iban: "",
         heightCm: "",
@@ -314,6 +355,10 @@ export default function Family() {
         pensionNo: String(values.pensionNo ?? ""),
         healthInsurance: String(values.healthInsurance ?? ""),
         healthInsuranceNo: String(values.healthInsuranceNo ?? ""),
+        idCardNo: String(values.idCardNo ?? ""),
+        passportNo: String(values.passportNo ?? ""),
+        passportIssuedOn: String(values.passportIssuedOn ?? ""),
+        passportExpiresOn: String(values.passportExpiresOn ?? ""),
         address: String(values.address ?? ""),
         iban: String(values.iban ?? ""),
       });
@@ -348,18 +393,27 @@ export default function Family() {
     const values = await dialog.form({
       title: "Person bearbeiten",
       fields: [
+        { key: "sec-basic", label: "Basis", type: "section" },
         { key: "fullName", label: "Name" },
-        { key: "relation", label: "Rolle" },
+        { key: "relation", label: "Rolle", type: "select", options: PERSON_ROLE_OPTIONS },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
         { key: "birthPlace", label: "Geburtsort" },
+
+        { key: "sec-docs", label: "Dokumente und Nummern", type: "section" },
         { key: "taxId", label: "Steuer-ID" },
         { key: "identificationNo", label: "Identifikationsnummer" },
         { key: "pensionNo", label: "Rentenversicherungsnummer" },
         { key: "healthInsurance", label: "Krankenversicherung" },
         { key: "healthInsuranceNo", label: "Versicherungsnummer" },
+        { key: "idCardNo", label: "Ausweisnummer" },
+        { key: "passportNo", label: "Passnummer" },
+        { key: "passportIssuedOn", label: "Pass ausgestellt am", type: "date" },
+        { key: "passportExpiresOn", label: "Pass gültig bis", type: "date" },
         { key: "address", label: "Anschrift" },
         { key: "iban", label: "IBAN" },
+
+        { key: "sec-health", label: "Gesundheit", type: "section" },
         { key: "heightCm", label: "Größe (cm)", type: "number" },
         { key: "weightKg", label: "Gewicht (kg)", type: "number" },
         { key: "allergies", label: "Allergien" },
@@ -376,6 +430,10 @@ export default function Family() {
         pensionNo: parsed.meta.pensionNo,
         healthInsurance: parsed.meta.healthInsurance,
         healthInsuranceNo: parsed.meta.healthInsuranceNo,
+        idCardNo: parsed.meta.idCardNo,
+        passportNo: parsed.meta.passportNo,
+        passportIssuedOn: parsed.meta.passportIssuedOn,
+        passportExpiresOn: parsed.meta.passportExpiresOn,
         address: parsed.meta.address,
         iban: parsed.meta.iban,
         heightCm: parsed.meta.heightCm,
@@ -398,6 +456,10 @@ export default function Family() {
         pensionNo: String(values.pensionNo ?? ""),
         healthInsurance: String(values.healthInsurance ?? ""),
         healthInsuranceNo: String(values.healthInsuranceNo ?? ""),
+        idCardNo: String(values.idCardNo ?? ""),
+        passportNo: String(values.passportNo ?? ""),
+        passportIssuedOn: String(values.passportIssuedOn ?? ""),
+        passportExpiresOn: String(values.passportExpiresOn ?? ""),
         address: String(values.address ?? ""),
         iban: String(values.iban ?? ""),
       });
@@ -1011,44 +1073,66 @@ export default function Family() {
             <div className="form-grid person-details-grid" style={{ marginBottom: 10 }}>
               {(() => {
                 const meta = parsePersonMeta(detailsMember.notes).meta;
-                const rows = [
-                  ["Name", detailsMember.fullName],
-                  ["Rolle", detailsMember.relation ?? ""],
-                  ["Geburtsdatum", detailsMember.birthDate ?? ""],
-                  ["Geburtsort", meta.birthPlace],
-                  ["Staatsangehörigkeit", detailsMember.nationality ?? ""],
-                  ["Steuer-ID", meta.taxId],
-                  ["Identifikationsnummer", meta.identificationNo],
-                  ["Rentenversicherungsnummer", meta.pensionNo],
-                  ["Krankenversicherung", meta.healthInsurance],
-                  ["Versicherungsnummer", meta.healthInsuranceNo],
-                  ["Anschrift", meta.address],
-                  ["IBAN", meta.iban],
-                  ["Größe (cm)", meta.heightCm],
-                  ["Gewicht (kg)", meta.weightKg],
-                  ["Allergien", meta.allergies],
-                  ["Medikamente", meta.medication],
-                ] as Array<[string, string]>;
+                const groups = [
+                  {
+                    title: "Basis",
+                    rows: [
+                      ["Name", detailsMember.fullName],
+                      ["Rolle", detailsMember.relation ?? ""],
+                      ["Geburtsdatum", detailsMember.birthDate ?? ""],
+                      ["Geburtsort", meta.birthPlace],
+                      ["Staatsangehörigkeit", detailsMember.nationality ?? ""],
+                    ],
+                  },
+                  {
+                    title: "Dokumente und Nummern",
+                    rows: [
+                      ["Steuer-ID", meta.taxId],
+                      ["Identifikationsnummer", meta.identificationNo],
+                      ["Rentenversicherungsnummer", meta.pensionNo],
+                      ["Ausweisnummer", meta.idCardNo],
+                      ["Passnummer", meta.passportNo],
+                      ["Pass ausgestellt am", meta.passportIssuedOn],
+                      ["Pass gültig bis", meta.passportExpiresOn],
+                      ["Krankenversicherung", meta.healthInsurance],
+                      ["Versicherungsnummer", meta.healthInsuranceNo],
+                      ["Anschrift", meta.address],
+                      ["IBAN", meta.iban],
+                    ],
+                  },
+                  {
+                    title: "Gesundheit",
+                    rows: [
+                      ["Größe (cm)", meta.heightCm],
+                      ["Gewicht (kg)", meta.weightKg],
+                      ["Allergien", meta.allergies],
+                      ["Medikamente", meta.medication],
+                    ],
+                  },
+                ] as Array<{ title: string; rows: Array<[string, string]> }>;
 
-                return rows.map(([label, value]) => {
-                  const copied = copiedField === label;
-                  return (
-                    <div key={label} className="person-detail-row">
-                      <div className="person-detail-label">{label}</div>
-                      <div className="person-detail-value" title={value || ""}>{value || "—"}</div>
-                      <button
-                        className="btn ghost small icon-only"
-                        onClick={() => { void copyValue(label, value); }}
-                        disabled={!value}
-                        aria-label={copied ? `${label} kopiert` : `${label} kopieren`}
-                        title={copied ? "Kopiert" : "Kopieren"}
-                      >
-                        <i className={`fa-solid ${copied ? "fa-check" : "fa-copy"}`} aria-hidden />
-                        <span className="sr-only">{copied ? "Kopiert" : "Kopieren"}</span>
-                      </button>
-                    </div>
-                  );
-                });
+                return groups.flatMap((group) => [
+                  <div key={`group-${group.title}`} className="person-details-group-title">{group.title}</div>,
+                  ...group.rows.map(([label, value]) => {
+                    const copied = copiedField === label;
+                    return (
+                      <div key={label} className="person-detail-row">
+                        <div className="person-detail-label">{label}</div>
+                        <div className="person-detail-value" title={value || ""}>{value || "—"}</div>
+                        <button
+                          className="btn ghost small icon-only"
+                          onClick={() => { void copyValue(label, value); }}
+                          disabled={!value}
+                          aria-label={copied ? `${label} kopiert` : `${label} kopieren`}
+                          title={copied ? "Kopiert" : "Kopieren"}
+                        >
+                          <i className={`fa-solid ${copied ? "fa-check" : "fa-copy"}`} aria-hidden />
+                          <span className="sr-only">{copied ? "Kopiert" : "Kopieren"}</span>
+                        </button>
+                      </div>
+                    );
+                  }),
+                ]);
               })()}
             </div>
             <div className="dlg-actions">

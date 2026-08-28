@@ -6,7 +6,7 @@ type Option = { value: string; label: string };
 type DialogField = {
   key: string;
   label: string;
-  type?: "text" | "number" | "date" | "datetime-local" | "select";
+  type?: "text" | "number" | "date" | "datetime-local" | "select" | "section";
   options?: Option[];
   visibleWhen?: (draft: Record<string, unknown>) => boolean;
 };
@@ -113,31 +113,37 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   closeForm(state.draft);
                 }}
               >
-                {state.fields.filter((f) => f.visibleWhen ? f.visibleWhen(state.draft) : true).map((f) => (
-                  <label className="field" key={f.key}>
-                    {f.label}
-                    {f.type === "select" ? (
-                      <select
-                        value={String(state.draft[f.key] ?? "")}
-                        onChange={(e) => setState((prev) => prev && prev.kind === "form"
-                          ? { ...prev, draft: { ...prev.draft, [f.key]: e.target.value } }
-                          : prev)}
-                      >
-                        {(f.options ?? []).map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type={f.type ?? "text"}
-                        value={String(state.draft[f.key] ?? "")}
-                        onChange={(e) => setState((prev) => prev && prev.kind === "form"
-                          ? { ...prev, draft: { ...prev.draft, [f.key]: e.target.value } }
-                          : prev)}
-                      />
-                    )}
-                  </label>
-                ))}
+                {state.fields.filter((f) => f.visibleWhen ? f.visibleWhen(state.draft) : true).map((f) => {
+                  if (f.type === "section") {
+                    return <div className="dlg-section-title" key={f.key}>{f.label}</div>;
+                  }
+
+                  return (
+                    <label className="field" key={f.key}>
+                      {f.label}
+                      {f.type === "select" ? (
+                        <select
+                          value={String(state.draft[f.key] ?? "")}
+                          onChange={(e) => setState((prev) => prev && prev.kind === "form"
+                            ? { ...prev, draft: { ...prev.draft, [f.key]: e.target.value } }
+                            : prev)}
+                        >
+                          {(f.options ?? []).map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={f.type ?? "text"}
+                          value={String(state.draft[f.key] ?? "")}
+                          onChange={(e) => setState((prev) => prev && prev.kind === "form"
+                            ? { ...prev, draft: { ...prev.draft, [f.key]: e.target.value } }
+                            : prev)}
+                        />
+                      )}
+                    </label>
+                  );
+                })}
                 <div className="dlg-actions">
                   <button type="button" className="btn ghost" onClick={() => closeForm(null)}>Abbrechen</button>
                   {state.secondarySubmitText && (
