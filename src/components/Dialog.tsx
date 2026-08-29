@@ -54,6 +54,7 @@ const DialogContext = createContext<DialogApi | null>(null);
 
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DialogState>(null);
+  const [closeOnBackdropClick, setCloseOnBackdropClick] = useState(false);
 
   const api = useMemo<DialogApi>(() => ({
     confirm: (opts) => new Promise<boolean>((resolve) => {
@@ -89,7 +90,18 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     <DialogContext.Provider value={api}>
       {children}
       {state && (
-        <div className="dlg-backdrop" role="presentation" onClick={() => state.kind === "confirm" ? closeConfirm(false) : closeForm(null)}>
+        <div
+          className="dlg-backdrop"
+          role="presentation"
+          onMouseDown={(e) => setCloseOnBackdropClick(e.target === e.currentTarget)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && closeOnBackdropClick) {
+              if (state.kind === "confirm") closeConfirm(false);
+              else closeForm(null);
+            }
+            setCloseOnBackdropClick(false);
+          }}
+        >
           <div className="dlg" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="dlg-head">
               <h3>{state.title}</h3>

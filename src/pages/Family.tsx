@@ -12,6 +12,7 @@ type PersonMeta = {
   allergies: string;
   medication: string;
   birthPlace: string;
+  secondNationality: string;
   taxId: string;
   identificationNo: string;
   pensionNo: string;
@@ -21,7 +22,11 @@ type PersonMeta = {
   passportNo: string;
   passportIssuedOn: string;
   passportExpiresOn: string;
+  passportNo2: string;
+  passportIssuedOn2: string;
+  passportExpiresOn2: string;
   address: string;
+  address2: string;
   iban: string;
 };
 
@@ -37,6 +42,7 @@ function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
     allergies: "",
     medication: "",
     birthPlace: "",
+    secondNationality: "",
     taxId: "",
     identificationNo: "",
     pensionNo: "",
@@ -46,7 +52,11 @@ function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
     passportNo: "",
     passportIssuedOn: "",
     passportExpiresOn: "",
+    passportNo2: "",
+    passportIssuedOn2: "",
+    passportExpiresOn2: "",
     address: "",
+    address2: "",
     iban: "",
   };
   const text = notes ?? "";
@@ -71,6 +81,7 @@ function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
       allergies: kv.get("allergies") ?? "",
       medication: kv.get("medication") ?? "",
       birthPlace: kv.get("birthPlace") ?? "",
+      secondNationality: kv.get("secondNationality") ?? "",
       taxId: kv.get("taxId") ?? "",
       identificationNo: kv.get("identificationNo") ?? "",
       pensionNo: kv.get("pensionNo") ?? "",
@@ -80,7 +91,11 @@ function parsePersonMeta(notes?: string | null): { meta: PersonMeta } {
       passportNo: kv.get("passportNo") ?? "",
       passportIssuedOn: kv.get("passportIssuedOn") ?? "",
       passportExpiresOn: kv.get("passportExpiresOn") ?? "",
+      passportNo2: kv.get("passportNo2") ?? "",
+      passportIssuedOn2: kv.get("passportIssuedOn2") ?? "",
+      passportExpiresOn2: kv.get("passportExpiresOn2") ?? "",
       address: kv.get("address") ?? "",
+      address2: kv.get("address2") ?? "",
       iban: kv.get("iban") ?? "",
     },
   };
@@ -93,6 +108,7 @@ function buildPersonNotes(meta: PersonMeta): string | null {
     `allergies:${meta.allergies.trim()}`,
     `medication:${meta.medication.trim()}`,
     `birthPlace:${meta.birthPlace.trim()}`,
+    `secondNationality:${meta.secondNationality.trim()}`,
     `taxId:${meta.taxId.trim()}`,
     `identificationNo:${meta.identificationNo.trim()}`,
     `pensionNo:${meta.pensionNo.trim()}`,
@@ -102,7 +118,11 @@ function buildPersonNotes(meta: PersonMeta): string | null {
     `passportNo:${meta.passportNo.trim()}`,
     `passportIssuedOn:${meta.passportIssuedOn.trim()}`,
     `passportExpiresOn:${meta.passportExpiresOn.trim()}`,
+    `passportNo2:${meta.passportNo2.trim()}`,
+    `passportIssuedOn2:${meta.passportIssuedOn2.trim()}`,
+    `passportExpiresOn2:${meta.passportExpiresOn2.trim()}`,
     `address:${meta.address.trim()}`,
+    `address2:${meta.address2.trim()}`,
     `iban:${meta.iban.trim()}`,
   ];
   const hasAnyMeta = lines.some((x) => x.split(":")[1]?.trim());
@@ -160,12 +180,6 @@ function fromDateTimeInput(value: unknown): string | null {
   if (!raw) return null;
   if (raw.length === 16) return `${raw}:00`;
   return raw;
-}
-
-function plusOneDay(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + 1);
-  return dateIso(d);
 }
 
 function parseMetaBlock(notes: string | null | undefined, startTag: string, endTag: string) {
@@ -257,6 +271,7 @@ const APPOINTMENT_CATEGORIES = [
 
 const PERSON_ROLE_OPTIONS = [
   { value: "", label: "-" },
+  { value: "Ich", label: "Ich" },
   { value: "Mutter", label: "Mutter" },
   { value: "Vater", label: "Vater" },
   { value: "Schwester", label: "Schwester" },
@@ -354,25 +369,7 @@ export default function Family() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [monthCursor, setMonthCursor] = useState(() => monthStartDate(new Date()));
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
-  const [onlyTomorrowWindow, setOnlyTomorrowWindow] = useState(false);
-  const [visibleCategories, setVisibleCategories] = useState<string[]>(() => APPOINTMENT_CATEGORIES.map((x) => x.value));
-
-  const todayIso = today();
-  const tomorrowIso = plusOneDay(todayIso);
-
-  function categoryVisible(category?: string | null) {
-    return visibleCategories.includes(normalizeCategory(category));
-  }
-
-  function inTomorrowWindow(iso: string) {
-    return iso === todayIso || iso === tomorrowIso;
-  }
-
-  function toggleCategory(category: string) {
-    setVisibleCategories((prev) => prev.includes(category)
-      ? prev.filter((x) => x !== category)
-      : [...prev, category]);
-  }
+  const [closeDetailsOnBackdropClick, setCloseDetailsOnBackdropClick] = useState(false);
 
   async function addMember() {
     const values = await dialog.form({
@@ -384,19 +381,24 @@ export default function Family() {
         { key: "relation", label: "Rolle", type: "select", options: PERSON_ROLE_OPTIONS },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
+        { key: "secondNationality", label: "Zweite Staatsangehörigkeit" },
         { key: "birthPlace", label: "Geburtsort" },
 
         { key: "sec-docs", label: "Dokumente und Nummern", type: "section" },
-        { key: "taxId", label: "Steuer-ID" },
+        { key: "taxId", label: "Steuernummer" },
         { key: "identificationNo", label: "Identifikationsnummer" },
         { key: "pensionNo", label: "Rentenversicherungsnummer" },
         { key: "healthInsurance", label: "Krankenversicherung" },
         { key: "healthInsuranceNo", label: "Versicherungsnummer" },
         { key: "idCardNo", label: "Ausweisnummer" },
-        { key: "passportNo", label: "Passnummer" },
-        { key: "passportIssuedOn", label: "Pass ausgestellt am", type: "date" },
-        { key: "passportExpiresOn", label: "Pass gültig bis", type: "date" },
-        { key: "address", label: "Anschrift" },
+        { key: "passportNo", label: "Passnummer 1" },
+        { key: "passportIssuedOn", label: "Pass 1 ausgestellt am", type: "date" },
+        { key: "passportExpiresOn", label: "Pass 1 gültig bis", type: "date" },
+        { key: "passportNo2", label: "Passnummer 2" },
+        { key: "passportIssuedOn2", label: "Pass 2 ausgestellt am", type: "date" },
+        { key: "passportExpiresOn2", label: "Pass 2 gültig bis", type: "date" },
+        { key: "address", label: "Anschrift 1" },
+        { key: "address2", label: "Anschrift 2" },
         { key: "iban", label: "IBAN" },
 
         { key: "sec-health", label: "Gesundheit", type: "section" },
@@ -410,6 +412,7 @@ export default function Family() {
         relation: "",
         birthDate: "",
         nationality: "",
+        secondNationality: "",
         birthPlace: "",
         taxId: "",
         identificationNo: "",
@@ -420,7 +423,11 @@ export default function Family() {
         passportNo: "",
         passportIssuedOn: "",
         passportExpiresOn: "",
+        passportNo2: "",
+        passportIssuedOn2: "",
+        passportExpiresOn2: "",
         address: "",
+        address2: "",
         iban: "",
         heightCm: "",
         weightKg: "",
@@ -438,6 +445,7 @@ export default function Family() {
         allergies: String(values.allergies ?? ""),
         medication: String(values.medication ?? ""),
         birthPlace: String(values.birthPlace ?? ""),
+        secondNationality: String(values.secondNationality ?? ""),
         taxId: String(values.taxId ?? ""),
         identificationNo: String(values.identificationNo ?? ""),
         pensionNo: String(values.pensionNo ?? ""),
@@ -447,7 +455,11 @@ export default function Family() {
         passportNo: String(values.passportNo ?? ""),
         passportIssuedOn: String(values.passportIssuedOn ?? ""),
         passportExpiresOn: String(values.passportExpiresOn ?? ""),
+        passportNo2: String(values.passportNo2 ?? ""),
+        passportIssuedOn2: String(values.passportIssuedOn2 ?? ""),
+        passportExpiresOn2: String(values.passportExpiresOn2 ?? ""),
         address: String(values.address ?? ""),
+        address2: String(values.address2 ?? ""),
         iban: String(values.iban ?? ""),
       });
 
@@ -486,19 +498,24 @@ export default function Family() {
         { key: "relation", label: "Rolle", type: "select", options: PERSON_ROLE_OPTIONS },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
+        { key: "secondNationality", label: "Zweite Staatsangehörigkeit" },
         { key: "birthPlace", label: "Geburtsort" },
 
         { key: "sec-docs", label: "Dokumente und Nummern", type: "section" },
-        { key: "taxId", label: "Steuer-ID" },
+        { key: "taxId", label: "Steuernummer" },
         { key: "identificationNo", label: "Identifikationsnummer" },
         { key: "pensionNo", label: "Rentenversicherungsnummer" },
         { key: "healthInsurance", label: "Krankenversicherung" },
         { key: "healthInsuranceNo", label: "Versicherungsnummer" },
         { key: "idCardNo", label: "Ausweisnummer" },
-        { key: "passportNo", label: "Passnummer" },
-        { key: "passportIssuedOn", label: "Pass ausgestellt am", type: "date" },
-        { key: "passportExpiresOn", label: "Pass gültig bis", type: "date" },
-        { key: "address", label: "Anschrift" },
+        { key: "passportNo", label: "Passnummer 1" },
+        { key: "passportIssuedOn", label: "Pass 1 ausgestellt am", type: "date" },
+        { key: "passportExpiresOn", label: "Pass 1 gültig bis", type: "date" },
+        { key: "passportNo2", label: "Passnummer 2" },
+        { key: "passportIssuedOn2", label: "Pass 2 ausgestellt am", type: "date" },
+        { key: "passportExpiresOn2", label: "Pass 2 gültig bis", type: "date" },
+        { key: "address", label: "Anschrift 1" },
+        { key: "address2", label: "Anschrift 2" },
         { key: "iban", label: "IBAN" },
 
         { key: "sec-health", label: "Gesundheit", type: "section" },
@@ -512,6 +529,7 @@ export default function Family() {
         relation: m.relation ?? "",
         birthDate: m.birthDate ?? "",
         nationality: m.nationality ?? "",
+        secondNationality: parsed.meta.secondNationality,
         birthPlace: parsed.meta.birthPlace,
         taxId: parsed.meta.taxId,
         identificationNo: parsed.meta.identificationNo,
@@ -522,7 +540,11 @@ export default function Family() {
         passportNo: parsed.meta.passportNo,
         passportIssuedOn: parsed.meta.passportIssuedOn,
         passportExpiresOn: parsed.meta.passportExpiresOn,
+        passportNo2: parsed.meta.passportNo2,
+        passportIssuedOn2: parsed.meta.passportIssuedOn2,
+        passportExpiresOn2: parsed.meta.passportExpiresOn2,
         address: parsed.meta.address,
+        address2: parsed.meta.address2,
         iban: parsed.meta.iban,
         heightCm: parsed.meta.heightCm,
         weightKg: parsed.meta.weightKg,
@@ -539,6 +561,7 @@ export default function Family() {
         allergies: String(values.allergies ?? ""),
         medication: String(values.medication ?? ""),
         birthPlace: String(values.birthPlace ?? ""),
+        secondNationality: String(values.secondNationality ?? ""),
         taxId: String(values.taxId ?? ""),
         identificationNo: String(values.identificationNo ?? ""),
         pensionNo: String(values.pensionNo ?? ""),
@@ -548,7 +571,11 @@ export default function Family() {
         passportNo: String(values.passportNo ?? ""),
         passportIssuedOn: String(values.passportIssuedOn ?? ""),
         passportExpiresOn: String(values.passportExpiresOn ?? ""),
+        passportNo2: String(values.passportNo2 ?? ""),
+        passportIssuedOn2: String(values.passportIssuedOn2 ?? ""),
+        passportExpiresOn2: String(values.passportExpiresOn2 ?? ""),
         address: String(values.address ?? ""),
+        address2: String(values.address2 ?? ""),
         iban: String(values.iban ?? ""),
       });
 
@@ -804,39 +831,33 @@ export default function Family() {
 
   const upcoming = (appts.data ?? [])
     .filter((a) => !a.isDone)
-    .filter((a) => categoryVisible(a.category))
-    .filter((a) => !onlyTomorrowWindow || inTomorrowWindow(a.startsAt.slice(0, 10)))
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const doneAppointments = (appts.data ?? [])
     .filter((a) => a.isDone)
-    .filter((a) => categoryVisible(a.category))
-    .filter((a) => !onlyTomorrowWindow || inTomorrowWindow(a.startsAt.slice(0, 10)))
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   const memberNameById = new Map((members.data ?? []).map((m) => [m.id, m.fullName]));
   const apptByDay = useMemo(() => {
     const map = new Map<string, Appointment[]>();
-    for (const a of (appts.data ?? []).filter((x) => !x.isDone).filter((x) => categoryVisible(x.category))) {
-      if (onlyTomorrowWindow && !inTomorrowWindow(a.startsAt.slice(0, 10))) continue;
+    for (const a of (appts.data ?? []).filter((x) => !x.isDone)) {
       const day = a.startsAt.slice(0, 10);
       const list = map.get(day) ?? [];
       list.push(a);
       map.set(day, list);
     }
     return map;
-  }, [appts.data, visibleCategories, onlyTomorrowWindow]);
+  }, [appts.data]);
 
   const importantByDay = useMemo(() => {
     const map = new Map<string, ImportantDate[]>();
     for (const d of (dates.data ?? [])) {
       const iso = occurrenceInMonth(d, monthCursor);
       if (!iso) continue;
-      if (onlyTomorrowWindow && !inTomorrowWindow(iso)) continue;
       const list = map.get(iso) ?? [];
       list.push(d);
       map.set(iso, list);
     }
     return map;
-  }, [dates.data, monthCursor, onlyTomorrowWindow]);
+  }, [dates.data, monthCursor]);
 
   const calendarCells = useMemo(() => {
     if (calendarView === "week") {
@@ -902,7 +923,7 @@ export default function Family() {
       <Section title="Personen" action={<button className="btn icon-only" aria-label="Person hinzufügen" title="Person hinzufügen" onClick={addMember}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Person hinzufügen</span></button>}>
         <div className="card">
           <table>
-            <thead><tr><th>Name</th><th>Rolle</th><th>Datum</th><th className="num action-col">Aktion</th></tr></thead>
+            <thead><tr><th>Name</th><th>Rolle</th><th>Geburtstag</th><th className="num action-col">Aktion</th></tr></thead>
             <tbody>
               {(members.data ?? []).map((m) => (
                 <tr key={m.id}>
@@ -959,16 +980,7 @@ export default function Family() {
               <div className="spacer" />
               <button className={`chip ${calendarView === "month" ? "on" : ""}`} onClick={() => setCalendarView("month")}>Monat</button>
               <button className={`chip ${calendarView === "week" ? "on" : ""}`} onClick={() => setCalendarView("week")}>Woche</button>
-              <button className={`chip ${onlyTomorrowWindow ? "on" : ""}`} onClick={() => setOnlyTomorrowWindow((v) => !v)}>Heute + Morgen</button>
               <button className="btn ghost small" onClick={() => setMonthCursor(new Date())}>Heute</button>
-            </div>
-
-            <div className="filters" style={{ marginBottom: 10 }}>
-              {APPOINTMENT_CATEGORIES.map((c) => (
-                <button key={c.value} className={`chip ${visibleCategories.includes(c.value) ? "on" : ""}`} onClick={() => toggleCategory(c.value)}>
-                  {c.label}
-                </button>
-              ))}
             </div>
 
             <div className="family-calendar">
@@ -1127,9 +1139,9 @@ export default function Family() {
         </Section>
       </div>
 
-      <Section title="Wiederholende Termine" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
+      <Section title="Wichtige Anlässe" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
         {(dates.data ?? []).length === 0
-          ? <Empty title="Noch keine wiederholenden Termine." hint="Monatliche und jährliche Erinnerungen erscheinen hier." />
+          ? <Empty title="Noch keine wichtigen Anlässe." hint="Geburtstage, Jahrestage und weitere wiederkehrende Anlässe erscheinen hier." />
           : <div className="card">
               <table>
                 <thead><tr><th>Anlass</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
@@ -1160,8 +1172,18 @@ export default function Family() {
       </Section>
 
       {detailsMember && (
-        <div className="dlg-backdrop" role="presentation" onClick={() => setDetailsMember(null)}>
-          <div className="dlg" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="dlg-backdrop"
+          role="presentation"
+          onMouseDown={(e) => setCloseDetailsOnBackdropClick(e.target === e.currentTarget)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && closeDetailsOnBackdropClick) {
+              setDetailsMember(null);
+            }
+            setCloseDetailsOnBackdropClick(false);
+          }}
+        >
+          <div className="dlg person-details-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="dlg-head">
               <h3>Personendetails</h3>
             </div>
@@ -1175,24 +1197,29 @@ export default function Family() {
                     rows: [
                       ["Name", detailsMember.fullName],
                       ["Rolle", detailsMember.relation ?? ""],
-                      ["Geburtsdatum", detailsMember.birthDate ?? ""],
+                      ["Geburtsdatum", shortDate(detailsMember.birthDate)],
                       ["Geburtsort", meta.birthPlace],
                       ["Staatsangehörigkeit", detailsMember.nationality ?? ""],
+                      ["Zweite Staatsangehörigkeit", meta.secondNationality],
                     ],
                   },
                   {
                     title: "Dokumente und Nummern",
                     rows: [
-                      ["Steuer-ID", meta.taxId],
+                      ["Steuernummer", meta.taxId],
                       ["Identifikationsnummer", meta.identificationNo],
                       ["Rentenversicherungsnummer", meta.pensionNo],
-                      ["Ausweisnummer", meta.idCardNo],
-                      ["Passnummer", meta.passportNo],
-                      ["Pass ausgestellt am", meta.passportIssuedOn],
-                      ["Pass gültig bis", meta.passportExpiresOn],
-                      ["Krankenversicherung", meta.healthInsurance],
                       ["Versicherungsnummer", meta.healthInsuranceNo],
-                      ["Anschrift", meta.address],
+                      ["Ausweisnummer", meta.idCardNo],
+                      ["Passnummer 1", meta.passportNo],
+                      ["Pass 1 ausgestellt am", shortDate(meta.passportIssuedOn || null)],
+                      ["Pass 1 gültig bis", shortDate(meta.passportExpiresOn || null)],
+                      ["Passnummer 2", meta.passportNo2],
+                      ["Pass 2 ausgestellt am", shortDate(meta.passportIssuedOn2 || null)],
+                      ["Pass 2 gültig bis", shortDate(meta.passportExpiresOn2 || null)],
+                      ["Krankenversicherung", meta.healthInsurance],
+                      ["Anschrift 1", meta.address],
+                      ["Anschrift 2", meta.address2],
                       ["IBAN", meta.iban],
                     ],
                   },
@@ -1212,12 +1239,13 @@ export default function Family() {
                   ...group.rows.map(([label, value]) => {
                     const copied = copiedField === label;
                     const isCodeLikeField = [
-                      "Steuer-ID",
+                      "Steuernummer",
                       "Identifikationsnummer",
                       "Rentenversicherungsnummer",
-                      "Ausweisnummer",
-                      "Passnummer",
                       "Versicherungsnummer",
+                      "Ausweisnummer",
+                      "Passnummer 1",
+                      "Passnummer 2",
                       "IBAN",
                     ].includes(label);
                     return (

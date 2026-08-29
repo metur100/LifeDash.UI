@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { api } from "../api/client";
+import type { DashboardResponse } from "../api/types";
 import { useAuth } from "./AuthContext";
 import { useTheme } from "./ThemeContext";
 
@@ -8,6 +10,7 @@ const links = [
   { to: "/family", label: "Familie", icon: "fa-solid fa-people-group" },
   { to: "/authorities", label: "Behörden", icon: "fa-solid fa-building-shield" },
   { to: "/finance", label: "Finanzen", icon: "fa-solid fa-wallet" },
+  { to: "/contracts", label: "Verträge", icon: "fa-solid fa-file-signature" },
   { to: "/wishlist", label: "Wunschliste", icon: "fa-solid fa-gift" },
   { to: "/travel", label: "Reisen", icon: "fa-solid fa-plane-departure" },
   { to: "/documents", label: "Dokumente", icon: "fa-solid fa-folder-open" },
@@ -18,7 +21,32 @@ export default function Layout({ alertCount }: { alertCount: number }) {
   const { session, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [navAlertCount, setNavAlertCount] = useState(alertCount);
   const location = useLocation();
+
+  const refreshAlertCount = useCallback(async () => {
+    try {
+      const data = await api.get<DashboardResponse>("/api/dashboard?horizonDays=120");
+      setNavAlertCount((data.summary.overdue ?? 0) + (data.summary.urgent ?? 0));
+    } catch {
+      // keep last shown count when dashboard endpoint is temporarily unavailable
+    }
+  }, []);
+
+  useEffect(() => {
+    setNavAlertCount(alertCount);
+  }, [alertCount]);
+
+  useEffect(() => {
+    void refreshAlertCount();
+  }, [location.pathname, refreshAlertCount]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void refreshAlertCount();
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [refreshAlertCount]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -62,8 +90,8 @@ export default function Layout({ alertCount }: { alertCount: number }) {
               <NavLink key={l.to} to={l.to} end={l.end} onClick={() => setMobileOpen(false)}>
                 <span className="nav-icon" aria-hidden><i className={l.icon} /></span>
                 {l.label}
-                {l.to === "/" && alertCount > 0 && (
-                  <span className="count" aria-label={`${alertCount} offene Hinweise`}>{alertCount}</span>
+                {l.to === "/" && navAlertCount > 0 && (
+                  <span className="count" aria-label={`${navAlertCount} offene Hinweise`}>{navAlertCount}</span>
                 )}
               </NavLink>
             ))}

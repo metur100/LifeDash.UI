@@ -89,15 +89,17 @@ type PaymentMeta = {
 };
 
 const parseNumber = (value: unknown) => Number(String(value ?? "0").replace(",", "."));
-const parseOptionalDay = (value: unknown) => {
-  const n = Number(String(value ?? "").trim());
-  return Number.isFinite(n) && n >= 1 && n <= 31 ? n : null;
-};
 
 const FINANCE_META_START = "[finance-meta]";
 const FINANCE_META_END = "[/finance-meta]";
 const PAYMENT_META_START = "[payment-meta]";
 const PAYMENT_META_END = "[/payment-meta]";
+const INCOME_META_START = "[income-meta]";
+const INCOME_META_END = "[/income-meta]";
+
+type IncomeMeta = {
+  anchorDate: string | null;
+};
 
 function parseMetaBlock(notes: string | null | undefined, startTag: string, endTag: string) {
   const text = notes ?? "";
@@ -159,6 +161,19 @@ function parsePaymentMeta(notes?: string | null, dueOn?: string): PaymentMeta {
 function withPaymentMeta(notes: string | null | undefined, meta: PaymentMeta): string | null {
   return writeMetaBlock(notes, PAYMENT_META_START, PAYMENT_META_END, [
     ["cadence", meta.cadence],
+    ["anchorDate", meta.anchorDate],
+  ]);
+}
+
+function parseIncomeMeta(notes?: string | null): IncomeMeta {
+  const parsed = parseMetaBlock(notes, INCOME_META_START, INCOME_META_END);
+  return {
+    anchorDate: parsed.values.get("anchorDate") ?? null,
+  };
+}
+
+function withIncomeMeta(notes: string | null | undefined, meta: IncomeMeta): string | null {
+  return writeMetaBlock(notes, INCOME_META_START, INCOME_META_END, [
     ["anchorDate", meta.anchorDate],
   ]);
 }
@@ -229,6 +244,26 @@ function nextSubscriptionDue(sub: Subscription, fromIso = today()): string {
   }
 
   return due.toISOString().slice(0, 10);
+}
+
+function nextIncomeDate(i: Income, fromIso = today()): string | null {
+  const meta = parseIncomeMeta(i.notes);
+  const anchor = meta.anchorDate;
+
+  if (i.cadence === "onetime") {
+    if (!anchor) return null;
+    return anchor >= fromIso ? anchor : null;
+  }
+
+  if (anchor && (i.cadence === "monthly" || i.cadence === "quarterly" || i.cadence === "yearly")) {
+    return nextDueFromAnchor(anchor, i.cadence, fromIso);
+  }
+
+  if (i.dayOfMonth) {
+    return nextDateForDay(i.dayOfMonth, fromIso);
+  }
+
+  return anchor;
 }
 
 function monthId(iso: string): string {
@@ -643,6 +678,7 @@ export default function Finance() {
   }
 
   async function editIncome(i: Income) {
+    const meta = parseIncomeMeta(i.notes);
     const values = await dialog.form({
       title: "Einnahme bearbeiten",
       fields: [
@@ -659,24 +695,34 @@ export default function Finance() {
             { value: "onetime", label: "onetime" },
           ],
         },
-        { key: "dayOfMonth", label: "Eingangstag (1-31, optional)", type: "number" },
+        { key: "anchorDate", label: "Einnahmedatum", type: "date" },
       ],
       initial: {
         source: i.source,
         amount: String(i.amount),
         cadence: i.cadence,
-        dayOfMonth: i.dayOfMonth ? String(i.dayOfMonth) : "",
+        anchorDate: meta.anchorDate ?? "",
       },
     });
     if (!values) return;
 
     try {
+      const cadence = String(values.cadence);
+      const anchorDate = String(values.anchorDate ?? "").trim() || null;
+      if (cadence === "onetime" && !anchorDate) {
+        setError("Für einmalige Einnahmen bitte ein Datum setzen.");
+        return;
+      }
+
       await api.put(`/api/incomes/${i.id}`, {
         ...i,
         source: String(values.source).trim(),
         amount: parseNumber(values.amount),
-        cadence: String(values.cadence),
-        dayOfMonth: parseOptionalDay(values.dayOfMonth),
+        cadence,
+        dayOfMonth: null,
+        notes: withIncomeMeta(i.notes, {
+          anchorDate,
+        }),
       });
       incomes.reload();
     } catch (e) {
@@ -718,13 +764,13 @@ export default function Finance() {
             { value: "onetime", label: "onetime" },
           ],
         },
-        { key: "dayOfMonth", label: "Eingangstag (1-31, optional)", type: "number" },
+        { key: "anchorDate", label: "Einnahmedatum", type: "date" },
       ],
       initial: {
         source: "",
         amount: "",
         cadence: "monthly",
-        dayOfMonth: "",
+        anchorDate: "",
       },
       submitText: "Anlegen",
     });
@@ -732,16 +778,25 @@ export default function Finance() {
 
     const source = String(values.source).trim();
     const amount = parseNumber(values.amount);
+    const cadence = String(values.cadence);
+    const anchorDate = String(values.anchorDate ?? "").trim() || null;
     if (!source || !Number.isFinite(amount) || amount <= 0) return;
+    if (cadence === "onetime" && !anchorDate) {
+      setError("Für einmalige Einnahmen bitte ein Datum setzen.");
+      return;
+    }
 
     try {
       await api.post("/api/incomes", {
         source,
         amount,
-        cadence: String(values.cadence),
-        dayOfMonth: parseOptionalDay(values.dayOfMonth),
+        cadence,
+        dayOfMonth: null,
         currency: "EUR",
         isActive: true,
+        notes: withIncomeMeta(null, {
+          anchorDate,
+        }),
       });
       incomes.reload();
     } catch (e) {
@@ -1335,21 +1390,23 @@ export default function Finance() {
                 <tr>
                   <th>Quelle</th>
                   <th>Turnus</th>
-                  <th className="hide-phone">Eingangstag</th>
+                  <th className="hide-phone">Nächste Einnahme</th>
                   <th className="num">Monat</th>
                   <th className="num hide-phone">Jahr</th>
                   <th className="num action-col">Aktion</th>
                 </tr>
               </thead>
               <tbody>
-                {(incomes.data ?? []).map((i) => (
+                {(incomes.data ?? []).map((i) => {
+                  const nextIncome = nextIncomeDate(i);
+                  return (
                   <tr key={i.id}>
                     <td>
                       <strong>{i.source}</strong>
                       <div className="alert-msg compact-mobile">{i.isActive ? "aktiv" : "pausiert"}</div>
                     </td>
                     <td>{cadenceLabel[i.cadence] ?? i.cadence}</td>
-                    <td className="hide-phone">{i.dayOfMonth ? `jeden ${i.dayOfMonth}.` : "-"}</td>
+                    <td className="hide-phone">{nextIncome ? shortDate(nextIncome) : "-"}</td>
                     <td className="num">{euro(monthly(i.amount, i.cadence), i.currency)}</td>
                     <td className="num hide-phone">{euro(yearly(i.amount, i.cadence), i.currency)}</td>
                     <td className="num action-cell">
@@ -1369,7 +1426,7 @@ export default function Finance() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                );})}
               </tbody>
             </table>
           </div>

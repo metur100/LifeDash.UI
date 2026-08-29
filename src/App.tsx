@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./components/AuthContext";
 import Layout from "./components/Layout";
 import Authorities from "./pages/Authorities";
+import Contracts from "./pages/Contracts";
 import Dashboard from "./pages/Dashboard";
 import Documents from "./pages/Documents";
 import Family from "./pages/Family";
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="authorities" element={<Authorities />} />
           <Route path="authorities/:id" element={<Authorities />} />
           <Route path="finance" element={<Finance />} />
+          <Route path="contracts" element={<Contracts />} />
           <Route path="wishlist" element={<WishList />} />
           <Route path="travel" element={<Travel />} />
           <Route path="travel/:id" element={<Travel />} />

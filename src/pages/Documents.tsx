@@ -27,6 +27,7 @@ const DRIVE_TOKEN_KEY = "ld_drive_access_token";
 const DRIVE_TOKEN_EXP_KEY = "ld_drive_access_token_expires";
 const DRIVE_PATH_KEY = "ld_drive_path";
 const DRIVE_FOLDER_KEY = "ld_drive_folder";
+const DRIVE_LINKED_KEY = "ld_drive_linked";
 
 const DRIVE_EXPORT_MIME: Record<string, { mime: string; ext: string }> = {
   "application/vnd.google-apps.document": { mime: "application/pdf", ext: "pdf" },
@@ -52,20 +53,21 @@ export default function Documents() {
   const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
 
   function persistDrivePath(path: Array<{ id: string; name: string }>) {
-    sessionStorage.setItem(DRIVE_PATH_KEY, JSON.stringify(path));
+    localStorage.setItem(DRIVE_PATH_KEY, JSON.stringify(path));
     const current = path[path.length - 1]?.id ?? "root";
-    sessionStorage.setItem(DRIVE_FOLDER_KEY, current);
+    localStorage.setItem(DRIVE_FOLDER_KEY, current);
   }
 
   useEffect(() => {
-    const storedToken = sessionStorage.getItem(DRIVE_TOKEN_KEY);
-    const storedExp = Number(sessionStorage.getItem(DRIVE_TOKEN_EXP_KEY) ?? "0");
+    const storedToken = localStorage.getItem(DRIVE_TOKEN_KEY);
+    const storedExp = Number(localStorage.getItem(DRIVE_TOKEN_EXP_KEY) ?? "0");
+    const wasLinked = localStorage.getItem(DRIVE_LINKED_KEY) === "1";
     if (storedToken && storedExp > Date.now()) {
       driveToken.current = storedToken;
       driveTokenExpiresAt.current = storedExp;
 
-      const rawPath = sessionStorage.getItem(DRIVE_PATH_KEY);
-      const rawFolder = sessionStorage.getItem(DRIVE_FOLDER_KEY);
+      const rawPath = localStorage.getItem(DRIVE_PATH_KEY);
+      const rawFolder = localStorage.getItem(DRIVE_FOLDER_KEY);
       let startPath: Array<{ id: string; name: string }> = [{ id: "root", name: "Meine Ablage" }];
       let startFolder = rawFolder || "root";
 
@@ -92,14 +94,49 @@ export default function Documents() {
           setDriveBusy(false);
         }
       })();
+      return;
     }
+
+    if (!wasLinked) return;
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const tryReconnect = () => {
+      if (cancelled) return;
+      attempts += 1;
+
+      void (async () => {
+        try {
+          const token = await ensureDriveToken(false, false);
+          if (cancelled) return;
+          const rootPath = [{ id: "root", name: "Meine Ablage" }];
+          setDrivePath(rootPath);
+          persistDrivePath(rootPath);
+          setDriveBusy(true);
+          const files = await fetchDriveFiles("root", token);
+          if (cancelled) return;
+          setDriveFiles(files);
+          setDriveInfo(`Google Drive ist verbunden. ${files.length} Einträge in Meine Ablage geladen.`);
+        } catch {
+          if (attempts < 10) window.setTimeout(tryReconnect, 600);
+        } finally {
+          if (!cancelled) setDriveBusy(false);
+        }
+      })();
+    };
+
+    tryReconnect();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function getGoogle() {
     return (window as unknown as { google?: any }).google;
   }
 
-  async function ensureDriveToken(forceRefresh = false) {
+  async function ensureDriveToken(forceRefresh = false, interactive = true) {
     const g = getGoogle();
     if (!googleClientId) throw new Error("Google Drive: setze VITE_GOOGLE_CLIENT_ID im Frontend.");
     if (!g?.accounts?.oauth2) throw new Error("Google Drive API ist noch nicht geladen.");
@@ -119,13 +156,13 @@ export default function Documents() {
           driveToken.current = resp.access_token;
           const expAt = Date.now() + Math.max(60, Number(resp.expires_in ?? 3600)) * 1000;
           driveTokenExpiresAt.current = expAt;
-          sessionStorage.setItem(DRIVE_TOKEN_KEY, resp.access_token);
-          sessionStorage.setItem(DRIVE_TOKEN_EXP_KEY, String(expAt));
+          localStorage.setItem(DRIVE_TOKEN_KEY, resp.access_token);
+          localStorage.setItem(DRIVE_TOKEN_EXP_KEY, String(expAt));
           resolve(resp.access_token);
         },
       });
 
-      tokenClient.requestAccessToken({ prompt: driveToken.current ? "" : "consent" });
+      tokenClient.requestAccessToken({ prompt: interactive ? (driveToken.current ? "" : "consent") : "" });
     });
   }
 
@@ -140,6 +177,7 @@ export default function Documents() {
       persistDrivePath(rootPath);
       const files = await fetchDriveFiles("root", token);
       setDriveFiles(files);
+      localStorage.setItem(DRIVE_LINKED_KEY, "1");
       setDriveInfo(`Google Drive ist verbunden. ${files.length} Einträge in Meine Ablage geladen.`);
     } catch (e) {
       setError((e as Error).message);
