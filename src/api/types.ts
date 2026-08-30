@@ -29,8 +29,6 @@ export interface DashboardSummary {
   soon: number;
   monthlyIncome: number;
   monthlyFixedCosts: number;
-  monthlySubscriptions: number;
-  monthlyContractIncome: number;
   monthlyBalance: number;
   openTasks: number;
   missingDocuments: number;
