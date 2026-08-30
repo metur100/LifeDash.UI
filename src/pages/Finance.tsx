@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { FixedCost, Income, Payment } from "../api/types";
 import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
-import { countdown, daysUntil, euro, shortDate, today } from "../lib/format";
+import { countdown, daysUntil, euro, localDateIso, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
 const monthly = (amount: number, cadence: string) => {
@@ -187,7 +187,7 @@ function addMonthsClamped(base: Date, months: number): Date {
 function addDays(baseIso: string, days: number): string {
   const d = new Date(`${baseIso}T00:00:00`);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localDateIso(d);
 }
 
 function parseIsoDate(iso: string): Date {
@@ -201,18 +201,18 @@ function nextDateForDay(dayOfMonth: number, fromIso = today()): string {
   const maxThisMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const safeDayThisMonth = Math.min(dayOfMonth, maxThisMonth);
   const candidate = new Date(currentYear, currentMonth, safeDayThisMonth);
-  if (candidate >= from) return candidate.toISOString().slice(0, 10);
+  if (candidate >= from) return localDateIso(candidate);
 
   const nextMonth = new Date(currentYear, currentMonth + 1, 1);
   const maxNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-  return new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(dayOfMonth, maxNextMonth)).toISOString().slice(0, 10);
+  return localDateIso(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(dayOfMonth, maxNextMonth)));
 }
 
 function addCadence(iso: string, cadence: string): string {
   const date = parseIsoDate(iso);
   const months = cadence === "monthly" ? 1 : cadence === "quarterly" ? 3 : cadence === "yearly" ? 12 : 0;
   if (months <= 0) return iso;
-  return addMonthsClamped(date, months).toISOString().slice(0, 10);
+  return localDateIso(addMonthsClamped(date, months));
 }
 
 function nextDueFromAnchor(anchorIso: string, cadence: string, fromIso = today()): string {
@@ -231,7 +231,7 @@ function nextDueFromAnchor(anchorIso: string, cadence: string, fromIso = today()
   let guard = 0;
   while (due < fromIso && guard < 240) {
     n += 1;
-    due = addMonthsClamped(anchor, n * step).toISOString().slice(0, 10);
+    due = localDateIso(addMonthsClamped(anchor, n * step));
     guard += 1;
   }
   return due;

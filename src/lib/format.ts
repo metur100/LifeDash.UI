@@ -10,7 +10,10 @@ export const dateTime = (iso?: string | null) =>
         day: "2-digit", month: "2-digit", year: "numeric",
         hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "—";
 
-export const today = () => new Date().toISOString().slice(0, 10);
+export const localDateIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export const today = () => localDateIso(new Date());
 
 export function daysUntil(iso?: string | null): number | null {
   if (!iso) return null;

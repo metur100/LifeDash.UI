@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { HomeItem } from "../api/types";
 import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
-import { euro, shortDate } from "../lib/format";
+import { euro, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
 function toNum(value: unknown): number {
@@ -97,7 +97,7 @@ export default function WishList() {
       await api.put(`/api/home-items/${w.id}`, {
         ...w,
         status: "done",
-        purchasedOn: new Date().toISOString().slice(0, 10),
+        purchasedOn: today(),
       });
       items.reload();
     } catch (e) {
