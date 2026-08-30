@@ -1,7 +1,6 @@
 ﻿import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { FixedCost, Income, Payment, Subscription } from "../api/types";
+import type { FixedCost, Income, Payment } from "../api/types";
 import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { countdown, daysUntil, euro, shortDate, today } from "../lib/format";
@@ -268,7 +267,6 @@ function withinDays(targetIso: string, daysAhead: number): boolean {
 export default function Finance() {
   const incomes = useAsync<Income[]>(() => api.get("/api/incomes"), []);
   const costs = useAsync<FixedCost[]>(() => api.get("/api/fixed-costs"), []);
-  const subs = useAsync<Subscription[]>(() => api.get("/api/subscriptions"), []);
   const payments = useAsync<Payment[]>(() => api.get("/api/payments"), []);
   const dialog = useDialog();
 
@@ -289,11 +287,6 @@ export default function Finance() {
       dayOfMonth: c.dayOfMonth,
     })).sort((a, b) => a.name.localeCompare(b.name));
   }, [costs.data]);
-
-  const activeContracts = useMemo(
-    () => (subs.data ?? []).filter((s) => s.isActive && s.flowType !== "none"),
-    [subs.data],
-  );
 
   const overview = useMemo(() => {
     const activeIncome = (incomes.data ?? []).filter((i) => i.isActive);
@@ -316,27 +309,18 @@ export default function Finance() {
       .filter((p) => Number(p.dueOn.slice(0, 4)) === year)
       .reduce((s, p) => s + p.amount, 0);
 
-    const contractCosts = activeContracts.filter((s) => s.flowType === "cost");
-    const contractIncomes = activeContracts.filter((s) => s.flowType === "income");
-    const contractCostMonthly = contractCosts.reduce((s, c) => s + monthly(c.amount ?? 0, c.cadence), 0);
-    const contractCostYearly = contractCosts.reduce((s, c) => s + yearly(c.amount ?? 0, c.cadence), 0);
-    const contractIncomeMonthly = contractIncomes.reduce((s, c) => s + monthly(c.amount ?? 0, c.cadence), 0);
-    const contractIncomeYearly = contractIncomes.reduce((s, c) => s + yearly(c.amount ?? 0, c.cadence), 0);
-
-    const leftMonth = monthIncome + contractIncomeMonthly - monthCosts - contractCostMonthly - dueThisMonth;
-    const leftYear = yearIncome + contractIncomeYearly - yearCosts - contractCostYearly - oneTimeThisYear;
+    const leftMonth = monthIncome - monthCosts - dueThisMonth;
+    const leftYear = yearIncome - yearCosts - oneTimeThisYear;
 
     return {
       monthIncome,
       yearIncome,
       monthCosts,
       yearCosts,
-      contractCostMonthly,
-      contractIncomeMonthly,
       leftMonth,
       leftYear,
     };
-  }, [incomes.data, costLines, payments.data, activeContracts]);
+  }, [incomes.data, costLines, payments.data]);
 
   const upcoming = useMemo<UpcomingItem[]>(() => {
     const allPayments = payments.data ?? [];
@@ -941,7 +925,7 @@ export default function Finance() {
         title="Jahresblick und Monatsplan"
         lede="Einnahmen, laufende Kosten und anstehende Zahlungen in einer Ansicht."
       />
-      <ErrorBar message={error ?? incomes.error ?? costs.error ?? subs.error ?? payments.error} />
+      <ErrorBar message={error ?? incomes.error ?? costs.error ?? payments.error} />
 
       <div className="stats finance-stats">
         <Stat label="Einnahmen / Monat" value={euro(overview.monthIncome)} />
@@ -1118,46 +1102,6 @@ export default function Finance() {
               </tbody>
             </table>
           </div>
-        </div>
-      </Section>
-
-      <Section
-        title="Verträge"
-        action={<Link className="btn ghost small" to="/contracts">Verträge verwalten</Link>}
-      >
-        <div className="card">
-          {activeContracts.length === 0 ? (
-            <Empty title="Keine Verträge mit Zahlung." hint="Verträge legst du unter Verträge und Kündigungen an — hier erscheinen nur die mit Kosten oder Einnahme." />
-          ) : (
-            <div className="table-scroll finance-table-wrap">
-              <table className="finance-table">
-                <thead>
-                  <tr>
-                    <th>Vertrag</th>
-                    <th>Art</th>
-                    <th>Turnus</th>
-                    <th className="num">Monat</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeContracts.map((s) => (
-                    <tr key={s.id}>
-                      <td><strong>{s.name}</strong></td>
-                      <td><span className="badge">{s.flowType === "income" ? "Einnahme" : "Kosten"}</span></td>
-                      <td>{cadenceLabel[s.cadence] ?? s.cadence}</td>
-                      <td className="num">{euro(monthly(s.amount ?? 0, s.cadence), s.currency)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="auth-hint" style={{ marginTop: 10 }}>
-            {overview.contractIncomeMonthly > 0 && `+${euro(overview.contractIncomeMonthly)} Einnahme`}
-            {overview.contractIncomeMonthly > 0 && overview.contractCostMonthly > 0 && " · "}
-            {overview.contractCostMonthly > 0 && `-${euro(overview.contractCostMonthly)} Kosten`}
-            {" "}pro Monat aus Verträgen — bereits in „Bleibt übrig" eingerechnet.
-          </p>
         </div>
       </Section>
 
