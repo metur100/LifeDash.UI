@@ -29,6 +29,17 @@ const DRIVE_PATH_KEY = "ld_drive_path";
 const DRIVE_FOLDER_KEY = "ld_drive_folder";
 const DRIVE_LINKED_KEY = "ld_drive_linked";
 
+function fileIconClass(d: Doc): string {
+  const type = (d.contentType ?? "").toLowerCase();
+  const name = (d.originalName ?? "").toLowerCase();
+  if (type.includes("pdf") || name.endsWith(".pdf")) return "fa-file-pdf";
+  if (type.includes("word") || name.endsWith(".doc") || name.endsWith(".docx")) return "fa-file-word";
+  if (type.includes("sheet") || type.includes("excel") || name.endsWith(".xls") || name.endsWith(".xlsx")) return "fa-file-excel";
+  if (type.startsWith("image/")) return "fa-file-image";
+  if (!d.originalName) return "fa-file-circle-question";
+  return "fa-file-lines";
+}
+
 const DRIVE_EXPORT_MIME: Record<string, { mime: string; ext: string }> = {
   "application/vnd.google-apps.document": { mime: "application/pdf", ext: "pdf" },
   "application/vnd.google-apps.spreadsheet": { mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ext: "xlsx" },
@@ -45,6 +56,7 @@ export default function Documents() {
   const [drivePath, setDrivePath] = useState<Array<{ id: string; name: string }>>([{ id: "root", name: "Meine Ablage" }]);
   const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
   const [filter, setFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [driveBusy, setDriveBusy] = useState(false);
   const fileFor = useRef<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -753,19 +765,73 @@ export default function Documents() {
 
       <input type="file" ref={fileInput} onChange={upload} style={{ display: "none" }} />
 
-      <div className="filters">
-        <button className={`chip ${filter === "all" ? "on" : ""}`} onClick={() => setFilter("all")}>Alle</button>
-        {categories.map((c) => (
-          <button key={c} className={`chip ${filter === c ? "on" : ""}`} onClick={() => setFilter(c)}>
-            {categoryLabels[c]}
+      <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div className="filters" style={{ marginBottom: 0 }}>
+          <button className={`chip ${filter === "all" ? "on" : ""}`} onClick={() => setFilter("all")}>Alle</button>
+          {categories.map((c) => (
+            <button key={c} className={`chip ${filter === c ? "on" : ""}`} onClick={() => setFilter(c)}>
+              {categoryLabels[c]}
+            </button>
+          ))}
+        </div>
+        <div className="view-toggle" role="group" aria-label="Ansicht wechseln">
+          <button className={`btn ghost small icon-only ${viewMode === "list" ? "on" : ""}`} aria-label="Listenansicht" title="Listenansicht" aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")}>
+            <i className="fa-solid fa-list" aria-hidden />
+            <span className="sr-only">Liste</span>
           </button>
-        ))}
+          <button className={`btn ghost small icon-only ${viewMode === "grid" ? "on" : ""}`} aria-label="Rasteransicht" title="Rasteransicht" aria-pressed={viewMode === "grid"} onClick={() => setViewMode("grid")}>
+            <i className="fa-solid fa-table-cells-large" aria-hidden />
+            <span className="sr-only">Raster</span>
+          </button>
+        </div>
       </div>
 
       <div className="card">
         {list.length === 0
           ? <Empty title="Keine Dokumente in dieser Kategorie." hint="Lege ein Dokument über das Plus an und lade die Datei hoch." />
-          : <div className="table-scroll docs-main-table"><table className="docs-table">
+          : viewMode === "grid" ? (
+            <div className="docs-grid">
+              {list.map((d) => {
+                const days = daysUntil(d.expiresOn);
+                const isImage = (d.contentType ?? "").startsWith("image/");
+                return (
+                  <div key={d.id} className="doc-card">
+                    <div className="doc-card-preview">
+                      {isImage
+                        ? <img src={api.fileUrl(d.id)} alt={d.title} loading="lazy" />
+                        : <i className={`fa-solid ${fileIconClass(d)}`} aria-hidden />}
+                    </div>
+                    <div className="doc-card-body">
+                      <strong title={d.title}>{d.title}</strong>
+                      {d.documentType && <div className="alert-msg">{d.documentType}</div>}
+                      <div className="doc-card-badges">
+                        <span className="badge">{categoryLabels[d.category] ?? d.category}</span>
+                        {d.expiresOn
+                          ? <span className={`badge ${days !== null && days < 0 ? "red" : days !== null && days <= 60 ? "amber" : "green"}`}>
+                              {countdown(days)}
+                            </span>
+                          : null}
+                      </div>
+                    </div>
+                    <div className="action-stack doc-card-actions">
+                      <button className="btn ghost small icon-only" aria-label="Dokument bearbeiten" title="Dokument bearbeiten" onClick={() => editDoc(d)}>
+                        <i className="fa-solid fa-pen-to-square" aria-hidden />
+                        <span className="sr-only">Bearbeiten</span>
+                      </button>
+                      <button className="btn ghost small icon-only" aria-label={d.originalName ? "Datei ersetzen" : "Datei hochladen"} title={d.originalName ? "Datei ersetzen" : "Datei hochladen"} onClick={() => pickFile(d.id)}>
+                        <i className={`fa-solid ${d.originalName ? "fa-arrows-rotate" : "fa-upload"}`} aria-hidden />
+                        <span className="sr-only">{d.originalName ? "Ersetzen" : "Hochladen"}</span>
+                      </button>
+                      <button className="btn danger small icon-only" aria-label="Dokument löschen" title="Dokument löschen" onClick={() => remove(d.id)}>
+                        <i className="fa-solid fa-trash" aria-hidden />
+                        <span className="sr-only">Löschen</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : <div className="table-scroll docs-main-table"><table className="docs-table">
               <thead>
                 <tr><th>Dokument</th><th>Kategorie</th><th>Läuft ab</th><th>Datei</th><th className="num action-col">Aktion</th></tr>
               </thead>

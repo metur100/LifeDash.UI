@@ -331,6 +331,10 @@ function occurrenceInMonth(d: ImportantDate, cursor: Date): string | null {
   return dateIso(new Date(year, month - 1, safeDay));
 }
 
+function attendeeNames(ids: number[], memberNameById: Map<number, string>): string {
+  return ids.map((id) => memberNameById.get(id) ?? "Person").join(", ");
+}
+
 function appointmentTooltip(a: Appointment, memberNameById: Map<number, string>): string {
   const lines = [
     a.title,
@@ -338,7 +342,7 @@ function appointmentTooltip(a: Appointment, memberNameById: Map<number, string>)
     `Zeit: ${dateTime(a.startsAt)}`,
   ];
   if (a.location) lines.push(`Ort: ${a.location}`);
-  if (a.familyMemberId) lines.push(`Person: ${memberNameById.get(a.familyMemberId) ?? "Person"}`);
+  if (a.attendeeIds.length > 0) lines.push(`Personen: ${attendeeNames(a.attendeeIds, memberNameById)}`);
   return lines.join("\n");
 }
 
@@ -389,8 +393,8 @@ export default function Family() {
         { key: "identificationNo", label: "Identifikationsnummer" },
         { key: "pensionNo", label: "Rentenversicherungsnummer" },
         { key: "healthInsurance", label: "Krankenversicherung" },
-        { key: "healthInsuranceNo", label: "Versicherungsnummer" },
         { key: "idCardNo", label: "Ausweisnummer" },
+        { key: "jmbg", label: "JMBG" },
         { key: "passportNo", label: "Passnummer 1" },
         { key: "passportIssuedOn", label: "Pass 1 ausgestellt am", type: "date" },
         { key: "passportExpiresOn", label: "Pass 1 gültig bis", type: "date" },
@@ -420,6 +424,7 @@ export default function Family() {
         healthInsurance: "",
         healthInsuranceNo: "",
         idCardNo: "",
+        jmbg: "",
         passportNo: "",
         passportIssuedOn: "",
         passportExpiresOn: "",
@@ -468,6 +473,7 @@ export default function Family() {
         relation: String(values.relation).trim() || null,
         birthDate: String(values.birthDate).trim() || null,
         nationality: String(values.nationality).trim() || null,
+        jmbg: String(values.jmbg ?? "").trim() || null,
         notes,
       });
       members.reload();
@@ -506,8 +512,8 @@ export default function Family() {
         { key: "identificationNo", label: "Identifikationsnummer" },
         { key: "pensionNo", label: "Rentenversicherungsnummer" },
         { key: "healthInsurance", label: "Krankenversicherung" },
-        { key: "healthInsuranceNo", label: "Versicherungsnummer" },
         { key: "idCardNo", label: "Ausweisnummer" },
+        { key: "jmbg", label: "JMBG" },
         { key: "passportNo", label: "Passnummer 1" },
         { key: "passportIssuedOn", label: "Pass 1 ausgestellt am", type: "date" },
         { key: "passportExpiresOn", label: "Pass 1 gültig bis", type: "date" },
@@ -537,6 +543,7 @@ export default function Family() {
         healthInsurance: parsed.meta.healthInsurance,
         healthInsuranceNo: parsed.meta.healthInsuranceNo,
         idCardNo: parsed.meta.idCardNo,
+        jmbg: m.jmbg ?? "",
         passportNo: parsed.meta.passportNo,
         passportIssuedOn: parsed.meta.passportIssuedOn,
         passportExpiresOn: parsed.meta.passportExpiresOn,
@@ -585,6 +592,7 @@ export default function Family() {
         relation: String(values.relation).trim() || null,
         birthDate: String(values.birthDate).trim() || null,
         nationality: String(values.nationality).trim() || null,
+        jmbg: String(values.jmbg ?? "").trim() || null,
         notes,
       });
       members.reload();
@@ -616,14 +624,14 @@ export default function Family() {
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
         { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
-        { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
+        { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
       ],
       initial: {
         title: a.title,
         startsAt: toLocalDateTimeInput(a.startsAt),
         location: a.location ?? "",
         category: normalizeCategory(a.category),
-        familyMemberId: a.familyMemberId ? String(a.familyMemberId) : "",
+        attendeeIds: a.attendeeIds.join(","),
       },
     });
     if (!values) return;
@@ -634,7 +642,7 @@ export default function Family() {
         startsAt: fromDateTimeInput(values.startsAt) ?? a.startsAt,
         location: String(values.location).trim() || null,
         category: normalizeCategory(String(values.category)),
-        familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
+        attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: a.reminderDays,
         isDone: false,
       };
@@ -723,14 +731,14 @@ export default function Family() {
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
         { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
-        { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
+        { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
       ],
       initial: {
         title: "",
         startsAt: "",
         location: "",
         category: "family",
-        familyMemberId: "",
+        attendeeIds: "",
       },
     });
     if (!values) return;
@@ -742,7 +750,7 @@ export default function Family() {
         startsAt: fromDateTimeInput(values.startsAt),
         location: String(values.location).trim() || null,
         category: normalizeCategory(String(values.category)),
-        familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
+        attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: 3,
         isDone: false,
       });
@@ -764,14 +772,14 @@ export default function Family() {
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
         { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
-        { key: "familyMemberId", label: "Person", type: "select", options: memberOptions },
+        { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
       ],
       initial: {
         title: "",
         startsAt: `${dayIso}T09:00`,
         location: "",
         category: "family",
-        familyMemberId: "",
+        attendeeIds: "",
       },
     });
     if (!values) return;
@@ -785,7 +793,7 @@ export default function Family() {
         startsAt,
         location: String(values.location).trim() || null,
         category: normalizeCategory(String(values.category)),
-        familyMemberId: String(values.familyMemberId).trim() ? Number(values.familyMemberId) : null,
+        attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: 3,
         isDone: false,
       });
@@ -1077,7 +1085,7 @@ export default function Family() {
                           <strong>{a.title}</strong>
                           <div className="alert-msg">
                             {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
-                            {a.familyMemberId ? ` · ${memberNameById.get(a.familyMemberId) ?? "Person"}` : ""}
+                            {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
                           </div>
                         </td>
                         <td className="num">
@@ -1115,7 +1123,7 @@ export default function Family() {
                         <strong>{a.title}</strong>
                           <div className="alert-msg">
                             {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
-                            {a.familyMemberId ? ` · ${memberNameById.get(a.familyMemberId) ?? "Person"}` : ""}
+                            {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
                           </div>
                       </td>
                       <td className="num action-cell">
@@ -1209,8 +1217,8 @@ export default function Family() {
                       ["Steuernummer", meta.taxId],
                       ["Identifikationsnummer", meta.identificationNo],
                       ["Rentenversicherungsnummer", meta.pensionNo],
-                      ["Versicherungsnummer", meta.healthInsuranceNo],
                       ["Ausweisnummer", meta.idCardNo],
+                      ["JMBG", detailsMember.jmbg ?? ""],
                       ["Passnummer 1", meta.passportNo],
                       ["Pass 1 ausgestellt am", shortDate(meta.passportIssuedOn || null)],
                       ["Pass 1 gültig bis", shortDate(meta.passportExpiresOn || null)],
@@ -1235,15 +1243,15 @@ export default function Family() {
                 ] as Array<{ title: string; rows: Array<[string, string]> }>;
 
                 return groups.flatMap((group) => [
-                  <div key={`group-${group.title}`} className="person-details-group-title">{group.title}</div>,
+                  <div key={`group-${group.title}`} className="dlg-section-title">{group.title}</div>,
                   ...group.rows.map(([label, value]) => {
                     const copied = copiedField === label;
                     const isCodeLikeField = [
                       "Steuernummer",
                       "Identifikationsnummer",
                       "Rentenversicherungsnummer",
-                      "Versicherungsnummer",
                       "Ausweisnummer",
+                      "JMBG",
                       "Passnummer 1",
                       "Passnummer 2",
                       "IBAN",

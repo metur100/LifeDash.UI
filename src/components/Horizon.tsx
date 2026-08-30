@@ -23,10 +23,10 @@ export default function Horizon({ alerts, horizon = 120 }:
       <div className="horizon-head">
         <span className="horizon-title">Fristen-Horizont · nächste {horizon} Tage</span>
         <div className="horizon-legend" aria-hidden>
-          <span><i className="dot" style={{ background: "var(--stamp)" }} />überfällig</span>
-          <span><i className="dot" style={{ background: "var(--amber)" }} />dringend</span>
-          <span><i className="dot" style={{ background: "var(--indigo)" }} />bald</span>
-          <span><i className="dot" style={{ background: "var(--ink-soft)" }} />Hinweis</span>
+          <span title="Termin oder Frist liegt bereits in der Vergangenheit — sofort erledigen."><i className="dot" style={{ background: "var(--stamp)" }} />überfällig</span>
+          <span title="Fällig in den nächsten 7 Tagen."><i className="dot" style={{ background: "var(--amber)" }} />dringend</span>
+          <span title="Fällig innerhalb der Erinnerungsfrist des Eintrags (mindestens 14 Tage)."><i className="dot" style={{ background: "var(--indigo)" }} />bald</span>
+          <span title="Liegt weiter in der Zukunft, aber noch im Anzeigezeitraum."><i className="dot" style={{ background: "var(--ink-soft)" }} />Hinweis</span>
         </div>
       </div>
 

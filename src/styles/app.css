@@ -657,6 +657,28 @@ input, select, textarea {
 textarea { min-height: 70px; resize: vertical; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
 
+.multiselect-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: var(--card);
+}
+
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.multiselect-option input { width: auto; }
+
 .dlg-section-title {
   grid-column: 1 / -1;
   font-family: var(--mono);
@@ -683,6 +705,73 @@ textarea { min-height: 70px; resize: vertical; }
 .docs-table {
   min-width: 760px;
   table-layout: auto;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.view-toggle .btn.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.doc-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--card) 90%, var(--bg));
+}
+
+.doc-card-preview {
+  height: 110px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 92%, var(--card));
+  color: var(--text-soft);
+  font-size: 34px;
+}
+
+.doc-card-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.doc-card-body {
+  padding: 8px 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-card-body strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-card-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.doc-card-actions {
+  padding: 8px 10px;
+  border-top: 1px solid var(--line);
+  justify-content: flex-end;
 }
 
 .contracts-table {
@@ -713,29 +802,32 @@ textarea { min-height: 70px; resize: vertical; }
 }
 
 .contracts-table th:nth-child(1),
-.contracts-table td:nth-child(1) { width: 18%; }
+.contracts-table td:nth-child(1) { width: 16%; }
 
 .contracts-table th:nth-child(2),
-.contracts-table td:nth-child(2) { width: 14%; }
+.contracts-table td:nth-child(2) { width: 9%; }
 
 .contracts-table th:nth-child(3),
 .contracts-table td:nth-child(3) { width: 11%; }
 
 .contracts-table th:nth-child(4),
-.contracts-table td:nth-child(4) { width: 11%; }
+.contracts-table td:nth-child(4) { width: 9%; }
 
 .contracts-table th:nth-child(5),
 .contracts-table td:nth-child(5),
 .contracts-table th:nth-child(6),
 .contracts-table td:nth-child(6),
 .contracts-table th:nth-child(7),
-.contracts-table td:nth-child(7) { width: 10%; }
+.contracts-table td:nth-child(7) { width: 9%; }
 
 .contracts-table th:nth-child(8),
-.contracts-table td:nth-child(8) { width: 10%; }
+.contracts-table td:nth-child(8) { width: 9%; }
 
 .contracts-table th:nth-child(9),
-.contracts-table td:nth-child(9) { width: 96px; }
+.contracts-table td:nth-child(9) { width: 9%; }
+
+.contracts-table th:nth-child(10),
+.contracts-table td:nth-child(10) { width: 96px; }
 
 .contracts-table td.action-cell {
   min-width: 96px;
@@ -1119,46 +1211,34 @@ textarea { min-height: 70px; resize: vertical; }
   }
 }
 
+/* same field language as the edit form's label.field: label above value */
 .person-detail-row {
   display: grid;
-  grid-template-columns: minmax(148px, 1.1fr) minmax(0, 1.9fr) auto;
-  gap: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px;
-  background: color-mix(in srgb, var(--card) 90%, var(--bg));
-}
-
-.person-details-group-title {
-  grid-column: 1 / -1;
-  font-family: var(--mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--accent);
-  margin-top: 2px;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
 }
 
 .person-detail-label {
-  font-family: var(--mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  line-height: 1.25;
-  color: var(--text-soft);
-  grid-column: 1 / 2;
+  grid-column: 1 / 3;
   grid-row: 1;
+  font-size: 12.5px;
+  color: var(--text-soft);
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .person-detail-value {
-  min-height: 20px;
+  grid-column: 1 / 2;
+  grid-row: 2;
   min-width: 0;
+  font-size: 14px;
+  color: var(--text);
   line-height: 1.3;
-  grid-column: 2 / 3;
-  grid-row: 1;
   align-self: center;
   overflow-wrap: anywhere;
 }
@@ -1170,30 +1250,9 @@ textarea { min-height: 70px; resize: vertical; }
 }
 
 .person-detail-row .btn {
-  grid-column: 3 / 4;
-  grid-row: 1;
+  grid-column: 2 / 3;
+  grid-row: 2;
   align-self: center;
-}
-
-@media (max-width: 700px) {
-  .person-detail-row {
-    grid-template-columns: 1fr auto;
-  }
-
-  .person-detail-label {
-    grid-column: 1 / 2;
-    grid-row: 1;
-  }
-
-  .person-detail-value {
-    grid-column: 1 / 2;
-    grid-row: 2;
-  }
-
-  .person-detail-row .btn {
-    grid-column: 2 / 3;
-    grid-row: 1 / span 2;
-  }
 }
 
 @media (max-width: 700px) {

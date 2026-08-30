@@ -6,7 +6,7 @@ type Option = { value: string; label: string };
 type DialogField = {
   key: string;
   label: string;
-  type?: "text" | "number" | "date" | "datetime-local" | "select" | "section";
+  type?: "text" | "number" | "date" | "datetime-local" | "select" | "multiselect" | "section";
   options?: Option[];
   visibleWhen?: (draft: Record<string, unknown>) => boolean;
 };
@@ -128,6 +128,34 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                 {state.fields.filter((f) => f.visibleWhen ? f.visibleWhen(state.draft) : true).map((f) => {
                   if (f.type === "section") {
                     return <div className="dlg-section-title" key={f.key}>{f.label}</div>;
+                  }
+
+                  if (f.type === "multiselect") {
+                    const selected = new Set(String(state.draft[f.key] ?? "").split(",").map((v) => v.trim()).filter(Boolean));
+                    return (
+                      <div className="field" key={f.key}>
+                        {f.label}
+                        <div className="multiselect-box">
+                          {(f.options ?? []).map((o) => (
+                            <label key={o.value} className="multiselect-option">
+                              <input
+                                type="checkbox"
+                                checked={selected.has(o.value)}
+                                onChange={(e) => {
+                                  const next = new Set(selected);
+                                  if (e.target.checked) next.add(o.value); else next.delete(o.value);
+                                  const value = Array.from(next).join(",");
+                                  setState((prev) => prev && prev.kind === "form"
+                                    ? { ...prev, draft: { ...prev.draft, [f.key]: value } }
+                                    : prev);
+                                }}
+                              />
+                              {o.label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
                   }
 
                   return (

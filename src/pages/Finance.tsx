@@ -1,4 +1,5 @@
 ﻿import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { FixedCost, Income, Payment, Subscription } from "../api/types";
 import { useDialog } from "../components/Dialog";
@@ -52,7 +53,6 @@ function categoryOptions(current?: string | null) {
 
 type CostLine = {
   key: string;
-  source: "fixed" | "subscription";
   id: number;
   name: string;
   category: string;
@@ -61,13 +61,11 @@ type CostLine = {
   cadence: string;
   isActive: boolean;
   dayOfMonth?: number | null;
-  renewsOn?: string | null;
-  cancelByOn?: string | null;
 };
 
 type UpcomingItem = {
   key: string;
-  source: "payment" | "fixed" | "subscription";
+  source: "payment" | "fixed";
   id: number;
   title: string;
   category: string;
@@ -230,22 +228,6 @@ function nextDueFromAnchor(anchorIso: string, cadence: string, fromIso = today()
   return due;
 }
 
-function nextSubscriptionDue(sub: Subscription, fromIso = today()): string {
-  const from = new Date(`${fromIso}T00:00:00`);
-  let due = new Date(`${sub.renewsOn}T00:00:00`);
-  if (Number.isNaN(due.getTime())) return fromIso;
-
-  if (sub.cadence === "monthly") {
-    while (due < from) due = addMonthsClamped(due, 1);
-  } else if (sub.cadence === "quarterly") {
-    while (due < from) due = addMonthsClamped(due, 3);
-  } else if (sub.cadence === "yearly") {
-    while (due < from) due = addMonthsClamped(due, 12);
-  }
-
-  return due.toISOString().slice(0, 10);
-}
-
 function nextIncomeDate(i: Income, fromIso = today()): string | null {
   const meta = parseIncomeMeta(i.notes);
   const anchor = meta.anchorDate;
@@ -292,13 +274,11 @@ export default function Finance() {
 
   const [error, setError] = useState<string | null>(null);
 
-  const subById = useMemo(() => new Map((subs.data ?? []).map((s) => [s.id, s])), [subs.data]);
   const costById = useMemo(() => new Map((costs.data ?? []).map((c) => [c.id, c])), [costs.data]);
 
   const costLines = useMemo<CostLine[]>(() => {
-    const fixed = (costs.data ?? []).map((c) => ({
+    return (costs.data ?? []).map((c) => ({
       key: `fixed-${c.id}`,
-      source: "fixed" as const,
       id: c.id,
       name: c.name,
       category: c.category?.trim() || "Fixkosten",
@@ -307,27 +287,13 @@ export default function Finance() {
       cadence: c.cadence,
       isActive: c.isActive,
       dayOfMonth: c.dayOfMonth,
-      renewsOn: null,
-      cancelByOn: null,
-    }));
+    })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [costs.data]);
 
-    const contracts = (subs.data ?? []).map((s) => ({
-      key: `sub-${s.id}`,
-      source: "subscription" as const,
-      id: s.id,
-      name: s.name,
-      category: s.provider?.trim() || "Abo/Vertrag",
-      amount: s.amount,
-      currency: s.currency,
-      cadence: s.cadence,
-      isActive: s.isActive,
-      dayOfMonth: null,
-      renewsOn: s.renewsOn,
-      cancelByOn: s.cancelByOn,
-    }));
-
-    return [...fixed, ...contracts].sort((a, b) => a.name.localeCompare(b.name));
-  }, [costs.data, subs.data]);
+  const activeContracts = useMemo(
+    () => (subs.data ?? []).filter((s) => s.isActive && s.flowType !== "none"),
+    [subs.data],
+  );
 
   const overview = useMemo(() => {
     const activeIncome = (incomes.data ?? []).filter((i) => i.isActive);
@@ -350,18 +316,27 @@ export default function Finance() {
       .filter((p) => Number(p.dueOn.slice(0, 4)) === year)
       .reduce((s, p) => s + p.amount, 0);
 
-    const leftMonth = monthIncome - monthCosts - dueThisMonth;
-    const leftYear = yearIncome - yearCosts - oneTimeThisYear;
+    const contractCosts = activeContracts.filter((s) => s.flowType === "cost");
+    const contractIncomes = activeContracts.filter((s) => s.flowType === "income");
+    const contractCostMonthly = contractCosts.reduce((s, c) => s + monthly(c.amount ?? 0, c.cadence), 0);
+    const contractCostYearly = contractCosts.reduce((s, c) => s + yearly(c.amount ?? 0, c.cadence), 0);
+    const contractIncomeMonthly = contractIncomes.reduce((s, c) => s + monthly(c.amount ?? 0, c.cadence), 0);
+    const contractIncomeYearly = contractIncomes.reduce((s, c) => s + yearly(c.amount ?? 0, c.cadence), 0);
+
+    const leftMonth = monthIncome + contractIncomeMonthly - monthCosts - contractCostMonthly - dueThisMonth;
+    const leftYear = yearIncome + contractIncomeYearly - yearCosts - contractCostYearly - oneTimeThisYear;
 
     return {
       monthIncome,
       yearIncome,
       monthCosts,
       yearCosts,
+      contractCostMonthly,
+      contractIncomeMonthly,
       leftMonth,
       leftYear,
     };
-  }, [incomes.data, costLines, payments.data]);
+  }, [incomes.data, costLines, payments.data, activeContracts]);
 
   const upcoming = useMemo<UpcomingItem[]>(() => {
     const allPayments = payments.data ?? [];
@@ -411,24 +386,8 @@ export default function Finance() {
       .filter((x) => !existsAsPayment(x))
       .filter((x) => withinDays(x.dueOn, UPCOMING_HORIZON_DAYS));
 
-    const subPlanned = (subs.data ?? [])
-      .filter((s) => s.isActive)
-      .map((s) => ({
-        key: `sub-next-${s.id}`,
-        source: "subscription" as const,
-        id: s.id,
-        title: s.name,
-        category: s.provider?.trim() || "Abo/Vertrag",
-        amount: s.amount,
-        currency: s.currency,
-        dueOn: nextSubscriptionDue(s),
-        cadence: s.cadence,
-      }))
-      .filter((x) => !existsAsPayment(x))
-      .filter((x) => withinDays(x.dueOn, UPCOMING_HORIZON_DAYS));
-
-    return [...openManual, ...fixedPlanned, ...subPlanned].sort((a, b) => a.dueOn.localeCompare(b.dueOn));
-  }, [payments.data, costs.data, subs.data]);
+    return [...openManual, ...fixedPlanned].sort((a, b) => a.dueOn.localeCompare(b.dueOn));
+  }, [payments.data, costs.data]);
 
   const paid = useMemo(() => (payments.data ?? [])
     .filter((p) => p.isPaid)
@@ -668,15 +627,6 @@ export default function Finance() {
     }
   }
 
-  async function toggleSubscription(s: Subscription) {
-    try {
-      await api.put(`/api/subscriptions/${s.id}`, { ...s, isActive: !s.isActive });
-      subs.reload();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-
   async function editIncome(i: Income) {
     const meta = parseIncomeMeta(i.notes);
     const values = await dialog.form({
@@ -904,70 +854,6 @@ export default function Finance() {
     }
   }
 
-  async function editSubscription(s: Subscription) {
-    const values = await dialog.form({
-      title: "Vertrag bearbeiten",
-      fields: [
-        { key: "name", label: "Name" },
-        { key: "amount", label: "Betrag", type: "number" },
-        {
-          key: "cadence",
-          label: "Turnus",
-          type: "select",
-          options: [
-            { value: "monthly", label: "monthly" },
-            { value: "quarterly", label: "quarterly" },
-            { value: "yearly", label: "yearly" },
-          ],
-        },
-        { key: "renewsOn", label: "Zahlungsdatum", type: "date" },
-        { key: "cancelByOn", label: "Kündigen bis", type: "date" },
-        { key: "provider", label: "Kategorie", type: "select", options: categoryOptions(s.provider) },
-      ],
-      initial: {
-        name: s.name,
-        amount: String(s.amount),
-        cadence: s.cadence,
-        renewsOn: s.renewsOn,
-        cancelByOn: s.cancelByOn ?? "",
-        provider: s.provider ?? "",
-      },
-    });
-    if (!values) return;
-
-    try {
-      await api.put(`/api/subscriptions/${s.id}`, {
-        ...s,
-        name: String(values.name).trim(),
-        amount: parseNumber(values.amount),
-        cadence: String(values.cadence),
-        renewsOn: String(values.renewsOn),
-        cancelByOn: String(values.cancelByOn).trim() || null,
-        provider: String(values.provider).trim() || null,
-      });
-      subs.reload();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-
-  async function removeSubscription(id: number) {
-    const ok = await dialog.confirm({
-      title: "Vertrag löschen",
-      message: "Vertrag wirklich löschen?",
-      confirmText: "Löschen",
-      danger: true,
-    });
-    if (!ok) return;
-
-    try {
-      await api.del(`/api/subscriptions/${id}`);
-      subs.reload();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-
   async function addRunningCost() {
     const values = await dialog.form({
       title: "Laufenden Kostenpunkt anlegen",
@@ -979,7 +865,6 @@ export default function Finance() {
           options: [
             { value: "variable", label: "Variable" },
             { value: "fixed", label: "Fixkosten" },
-            { value: "subscription", label: "Abo/Vertrag" },
           ],
         },
         { key: "name", label: "Name" },
@@ -1000,18 +885,6 @@ export default function Finance() {
           type: "date",
           visibleWhen: (draft) => String(draft.kind ?? "") === "fixed",
         },
-        {
-          key: "renewsOn",
-          label: "Zahlungsdatum",
-          type: "date",
-          visibleWhen: (draft) => String(draft.kind ?? "") === "subscription",
-        },
-        {
-          key: "cancelByOn",
-          label: "Kündigungsdatum",
-          type: "date",
-          visibleWhen: (draft) => String(draft.kind ?? "") === "subscription",
-        },
         { key: "category", label: "Kategorie", type: "select", options: categoryOptions("sonstiges") },
       ],
       initial: {
@@ -1020,8 +893,6 @@ export default function Finance() {
         amount: "",
         cadence: "monthly",
         billingDate: "",
-        renewsOn: today(),
-        cancelByOn: "",
         category: "",
       },
       submitText: "Anlegen",
@@ -1038,46 +909,26 @@ export default function Finance() {
     const billingDate = kind === "fixed"
       ? String(values.billingDate ?? "").trim() || null
       : null;
+    if (kind === "fixed" && !billingDate) {
+      setError("Für Fixkosten bitte ein Zahlungsdatum wählen.");
+      return;
+    }
+
     try {
-      if (kind === "subscription") {
-        const renewsOn = String(values.renewsOn ?? "").trim();
-        if (!renewsOn) {
-          setError("Für Abo/Vertrag bitte ein Zahlungsdatum wählen.");
-          return;
-        }
-
-        await api.post("/api/subscriptions", {
-          name,
-          amount,
-          cadence,
-          renewsOn,
-          cancelByOn: String(values.cancelByOn).trim() || null,
-          provider: category,
-          currency: "EUR",
-          isActive: true,
-        });
-      } else {
-        if (kind === "fixed" && !billingDate) {
-          setError("Für Fixkosten bitte ein Zahlungsdatum wählen.");
-          return;
-        }
-
-        await api.post("/api/fixed-costs", {
-          name,
-          amount,
-          cadence,
-          dayOfMonth: billingDate ? parseIsoDate(billingDate).getDate() : null,
-          category,
-          currency: "EUR",
-          isActive: true,
-          notes: withFixedCostMeta(null, {
-            billingDate,
-            costType: kind === "variable" ? "variable" : "fixed",
-          }),
-        });
-      }
+      await api.post("/api/fixed-costs", {
+        name,
+        amount,
+        cadence,
+        dayOfMonth: billingDate ? parseIsoDate(billingDate).getDate() : null,
+        category,
+        currency: "EUR",
+        isActive: true,
+        notes: withFixedCostMeta(null, {
+          billingDate,
+          costType: kind === "variable" ? "variable" : "fixed",
+        }),
+      });
       costs.reload();
-      subs.reload();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -1138,9 +989,7 @@ export default function Finance() {
                           <span className="badge">
                             {item.source === "payment"
                               ? (cadenceLabel[parsePaymentMeta(item.payment?.notes, item.dueOn).cadence] ?? "einmalig")
-                              : item.source === "fixed"
-                                ? `Fixkosten · ${cadenceLabel[item.cadence ?? "monthly"] ?? item.cadence}`
-                                : `Abo/Vertrag · ${cadenceLabel[item.cadence ?? "monthly"] ?? item.cadence}`}
+                              : `Fixkosten · ${cadenceLabel[item.cadence ?? "monthly"] ?? item.cadence}`}
                           </span>
                         </td>
                         <td>
@@ -1167,7 +1016,7 @@ export default function Finance() {
                                 <span className="sr-only">Löschen</span>
                               </button>
                             </>
-                          ) : item.source === "fixed" ? (
+                          ) : (
                             <>
                               <button className="btn ghost small icon-only" aria-label="Als bezahlt markieren" title="Als bezahlt markieren" onClick={() => markProjectedPaid(item)}>
                                 <i className="fa-solid fa-circle-check" aria-hidden />
@@ -1181,24 +1030,6 @@ export default function Finance() {
                                 <span className="sr-only">Bearbeiten</span>
                               </button>{" "}
                               <button className="btn danger small icon-only" aria-label="Fixkosten löschen" title="Fixkosten löschen" onClick={() => removeCost(item.id)}>
-                                <i className="fa-solid fa-trash" aria-hidden />
-                                <span className="sr-only">Löschen</span>
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button className="btn ghost small icon-only" aria-label="Als bezahlt markieren" title="Als bezahlt markieren" onClick={() => markProjectedPaid(item)}>
-                                <i className="fa-solid fa-circle-check" aria-hidden />
-                                <span className="sr-only">Bezahlt</span>
-                              </button>{" "}
-                              <button className="btn ghost small icon-only" aria-label="Vertrag bearbeiten" title="Vertrag bearbeiten" onClick={() => {
-                                const s = subById.get(item.id);
-                                if (s) void editSubscription(s);
-                              }}>
-                                <i className="fa-solid fa-pen-to-square" aria-hidden />
-                                <span className="sr-only">Bearbeiten</span>
-                              </button>{" "}
-                              <button className="btn danger small icon-only" aria-label="Vertrag löschen" title="Vertrag löschen" onClick={() => removeSubscription(item.id)}>
                                 <i className="fa-solid fa-trash" aria-hidden />
                                 <span className="sr-only">Löschen</span>
                               </button>
@@ -1240,8 +1071,7 @@ export default function Finance() {
               </thead>
               <tbody>
                 {costLines.map((line) => {
-                  const cancel = daysUntil(line.cancelByOn);
-                  const fixedMeta = line.source === "fixed" ? parseFixedCostMeta(costById.get(line.id)?.notes) : null;
+                  const fixedMeta = parseFixedCostMeta(costById.get(line.id)?.notes);
                   return (
                     <tr key={line.key}>
                       <td>
@@ -1250,63 +1080,36 @@ export default function Finance() {
                       </td>
                       <td>{cadenceLabel[line.cadence] ?? line.cadence}</td>
                       <td className="hide-phone">
-                        {line.source === "fixed"
-                          ? (() => {
-                            if (fixedMeta?.costType === "variable") return "Variable";
-                            const anchor = fixedMeta?.billingDate;
-                            if (!anchor || !line.dayOfMonth) return "kein Zahltag";
-                            const label = cadenceLabel[line.cadence] ?? line.cadence;
-                            return `${shortDate(anchor)} · ${label}`;
-                          })()
-                          : (line.cancelByOn ? `kündigen bis ${shortDate(line.cancelByOn)} (${countdown(cancel)})` : `fällig am ${shortDate(line.renewsOn)}`)}
+                        {(() => {
+                          if (fixedMeta?.costType === "variable") return "Variable";
+                          const anchor = fixedMeta?.billingDate;
+                          if (!anchor || !line.dayOfMonth) return "kein Zahltag";
+                          const label = cadenceLabel[line.cadence] ?? line.cadence;
+                          return `${shortDate(anchor)} · ${label}`;
+                        })()}
                       </td>
                       <td className="num">{euro(monthly(line.amount, line.cadence), line.currency)}</td>
                       <td className="num hide-phone">{euro(yearly(line.amount, line.cadence), line.currency)}</td>
                       <td className="num action-cell">
                         <div className="action-stack">
-                        {line.source === "fixed" ? (
-                          <>
-                            <button className="btn ghost small icon-only" aria-label={line.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} title={line.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} onClick={() => {
-                              const c = costById.get(line.id);
-                              if (c) void toggleCost(c);
-                            }}>
-                              <i className={`fa-solid ${line.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
-                              <span className="sr-only">Status</span>
-                            </button>{" "}
-                            <button className="btn ghost small icon-only" aria-label="Fixkosten bearbeiten" title="Fixkosten bearbeiten" onClick={() => {
-                              const c = costById.get(line.id);
-                              if (c) void editCost(c);
-                            }}>
-                              <i className="fa-solid fa-pen-to-square" aria-hidden />
-                              <span className="sr-only">Bearbeiten</span>
-                            </button>{" "}
-                            <button className="btn danger small icon-only" aria-label="Fixkosten löschen" title="Fixkosten löschen" onClick={() => removeCost(line.id)}>
-                              <i className="fa-solid fa-trash" aria-hidden />
-                              <span className="sr-only">Löschen</span>
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button className="btn ghost small icon-only" aria-label={line.isActive ? "Vertrag pausieren" : "Vertrag aktivieren"} title={line.isActive ? "Vertrag pausieren" : "Vertrag aktivieren"} onClick={() => {
-                              const s = subById.get(line.id);
-                              if (s) void toggleSubscription(s);
-                            }}>
-                              <i className={`fa-solid ${line.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
-                              <span className="sr-only">Status</span>
-                            </button>{" "}
-                            <button className="btn ghost small icon-only" aria-label="Vertrag bearbeiten" title="Vertrag bearbeiten" onClick={() => {
-                              const s = subById.get(line.id);
-                              if (s) void editSubscription(s);
-                            }}>
-                              <i className="fa-solid fa-pen-to-square" aria-hidden />
-                              <span className="sr-only">Bearbeiten</span>
-                            </button>{" "}
-                            <button className="btn danger small icon-only" aria-label="Vertrag löschen" title="Vertrag löschen" onClick={() => removeSubscription(line.id)}>
-                              <i className="fa-solid fa-trash" aria-hidden />
-                              <span className="sr-only">Löschen</span>
-                            </button>
-                          </>
-                        )}
+                          <button className="btn ghost small icon-only" aria-label={line.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} title={line.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} onClick={() => {
+                            const c = costById.get(line.id);
+                            if (c) void toggleCost(c);
+                          }}>
+                            <i className={`fa-solid ${line.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
+                            <span className="sr-only">Status</span>
+                          </button>{" "}
+                          <button className="btn ghost small icon-only" aria-label="Fixkosten bearbeiten" title="Fixkosten bearbeiten" onClick={() => {
+                            const c = costById.get(line.id);
+                            if (c) void editCost(c);
+                          }}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>{" "}
+                          <button className="btn danger small icon-only" aria-label="Fixkosten löschen" title="Fixkosten löschen" onClick={() => removeCost(line.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1315,6 +1118,46 @@ export default function Finance() {
               </tbody>
             </table>
           </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Verträge"
+        action={<Link className="btn ghost small" to="/contracts">Verträge verwalten</Link>}
+      >
+        <div className="card">
+          {activeContracts.length === 0 ? (
+            <Empty title="Keine Verträge mit Zahlung." hint="Verträge legst du unter Verträge und Kündigungen an — hier erscheinen nur die mit Kosten oder Einnahme." />
+          ) : (
+            <div className="table-scroll finance-table-wrap">
+              <table className="finance-table">
+                <thead>
+                  <tr>
+                    <th>Vertrag</th>
+                    <th>Art</th>
+                    <th>Turnus</th>
+                    <th className="num">Monat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeContracts.map((s) => (
+                    <tr key={s.id}>
+                      <td><strong>{s.name}</strong></td>
+                      <td><span className="badge">{s.flowType === "income" ? "Einnahme" : "Kosten"}</span></td>
+                      <td>{cadenceLabel[s.cadence] ?? s.cadence}</td>
+                      <td className="num">{euro(monthly(s.amount ?? 0, s.cadence), s.currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="auth-hint" style={{ marginTop: 10 }}>
+            {overview.contractIncomeMonthly > 0 && `+${euro(overview.contractIncomeMonthly)} Einnahme`}
+            {overview.contractIncomeMonthly > 0 && overview.contractCostMonthly > 0 && " · "}
+            {overview.contractCostMonthly > 0 && `-${euro(overview.contractCostMonthly)} Kosten`}
+            {" "}pro Monat aus Verträgen — bereits in „Bleibt übrig" eingerechnet.
+          </p>
         </div>
       </Section>
 

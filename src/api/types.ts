@@ -30,6 +30,7 @@ export interface DashboardSummary {
   monthlyIncome: number;
   monthlyFixedCosts: number;
   monthlySubscriptions: number;
+  monthlyContractIncome: number;
   monthlyBalance: number;
   openTasks: number;
   missingDocuments: number;
@@ -47,7 +48,7 @@ export interface FamilyMember {
   id: number; userId: number; fullName: string; relation?: string | null;
   birthDate?: string | null; nationality?: string | null;
   schoolName?: string | null; schoolGrade?: string | null;
-  schoolNote?: string | null; notes?: string | null;
+  schoolNote?: string | null; jmbg?: string | null; notes?: string | null;
 }
 
 export interface Doc {
@@ -59,7 +60,7 @@ export interface Doc {
 }
 
 export interface Appointment {
-  id: number; userId: number; familyMemberId?: number | null;
+  id: number; userId: number; attendeeIds: number[];
   title: string; category: string; startsAt: string; endsAt?: string | null;
   location?: string | null; reminderDays: number; notes?: string | null; isDone: boolean;
 }
@@ -97,11 +98,16 @@ export interface FixedCost {
   dayOfMonth?: number | null; isActive: boolean; notes?: string | null;
 }
 
+export type ContractFlowType = "none" | "cost" | "income";
+
 export interface Subscription {
   id: number; userId: number; name: string; provider?: string | null;
-  amount: number; currency: string; cadence: string;
+  flowType: ContractFlowType; familyMemberId?: number | null;
+  amount: number | null; currency: string; cadence: string;
+  startOn?: string | null; endOn?: string | null;
   renewsOn: string; cancelByOn?: string | null;
-  noticePeriodDays?: number | null; isActive: boolean; notes?: string | null;
+  noticePeriodDays?: number | null; noticeText?: string | null;
+  isActive: boolean; notes?: string | null;
 }
 
 export interface Payment {
