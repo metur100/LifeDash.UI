@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { api, getToken } from "../api/client";
 import type { Doc } from "../api/types";
 import { useDialog } from "../components/Dialog";
@@ -40,6 +40,20 @@ function fileIconClass(d: Doc): string {
   return "fa-file-lines";
 }
 
+function driveIconClass(f: DriveFile): string {
+  const type = f.mimeType ?? "";
+  if (type === DRIVE_FOLDER_MIME) return "fa-folder";
+  if (type === "application/vnd.google-apps.document") return "fa-file-lines";
+  if (type === "application/vnd.google-apps.spreadsheet") return "fa-file-excel";
+  if (type === "application/vnd.google-apps.presentation") return "fa-file-powerpoint";
+  if (type === "application/vnd.google-apps.drawing") return "fa-file-image";
+  if (type === "application/pdf") return "fa-file-pdf";
+  if (type.startsWith("image/")) return "fa-file-image";
+  if (type.includes("word")) return "fa-file-word";
+  if (type.includes("sheet") || type.includes("excel")) return "fa-file-excel";
+  return "fa-file";
+}
+
 const DRIVE_EXPORT_MIME: Record<string, { mime: string; ext: string }> = {
   "application/vnd.google-apps.document": { mime: "application/pdf", ext: "pdf" },
   "application/vnd.google-apps.spreadsheet": { mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ext: "xlsx" },
@@ -57,6 +71,7 @@ export default function Documents() {
   const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
   const [filter, setFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [driveViewMode, setDriveViewMode] = useState<"list" | "grid">("list");
   const [driveBusy, setDriveBusy] = useState(false);
   const fileFor = useRef<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -599,6 +614,57 @@ export default function Documents() {
     .filter((d) => filter === "all" || d.category === filter)
     .sort((a, b) => (a.expiresOn ?? "9999").localeCompare(b.expiresOn ?? "9999"));
 
+  function driveFileActions(f: DriveFile) {
+    if (f.mimeType === DRIVE_FOLDER_MIME) return null;
+    return (
+      <>
+        <button className="btn ghost small icon-only" aria-label="Datei herunterladen" title="Datei herunterladen" onClick={() => downloadDriveFile(f)} disabled={driveBusy}>
+          <i className="fa-solid fa-download" aria-hidden />
+          <span className="sr-only">Herunterladen</span>
+        </button>
+        <button className="btn ghost small icon-only" aria-label="Vorschau in App" title="Vorschau in App" onClick={() => openPreview(f)} disabled={driveBusy}>
+          <i className="fa-solid fa-eye" aria-hidden />
+          <span className="sr-only">Vorschau</span>
+        </button>
+        <button className="btn ghost small icon-only" aria-label="Drive-Datei importieren" title="Drive-Datei importieren" onClick={() => importDriveFile(f)} disabled={driveBusy}>
+          <i className="fa-solid fa-file-import" aria-hidden />
+          <span className="sr-only">Importieren</span>
+        </button>
+      </>
+    );
+  }
+
+  function drivePreviewBlock(file: DriveFile) {
+    return (
+      <div className="drive-preview-inline">
+        <div className="row" style={{ marginBottom: 8 }}>
+          <strong>Vorschau: {file.name}</strong>
+          <div className="spacer" />
+          <button className="btn ghost small icon-only" aria-label="Datei herunterladen" title="Datei herunterladen" onClick={() => downloadDriveFile(file)}>
+            <i className="fa-solid fa-download" aria-hidden />
+            <span className="sr-only">Datei herunterladen</span>
+          </button>{" "}
+          <a className="btn ghost small icon-only" href={file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`} target="_blank" rel="noreferrer" aria-label="In Google Drive öffnen" title="In Google Drive öffnen">
+            <i className="fa-solid fa-up-right-from-square" aria-hidden />
+            <span className="sr-only">In Google Drive öffnen</span>
+          </a>{" "}
+          <button className="btn ghost small icon-only" aria-label="Vorschau schließen" title="Vorschau schließen" onClick={() => setPreviewFile(null)}>
+            <i className="fa-solid fa-xmark" aria-hidden />
+            <span className="sr-only">Vorschau schließen</span>
+          </button>
+        </div>
+        <iframe
+          title={`Drive Vorschau ${file.name}`}
+          src={`https://drive.google.com/file/d/${file.id}/preview`}
+          style={{ width: "100%", minHeight: 420, border: "1px solid var(--line)", borderRadius: 10, background: "#fff" }}
+        />
+        <p className="auth-hint" style={{ marginTop: 8 }}>
+          Hinweis: Manche Dateitypen oder Freigaben erlauben keine eingebettete Vorschau. Dann bitte über das Öffnen-Symbol in Google Drive ansehen.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
       <PageHead eyebrow="Dokumente" title="Ablage mit Ablaufdatum"
@@ -634,131 +700,111 @@ export default function Documents() {
         {driveFiles.length > 0 && (
           <div style={{ marginTop: 10 }}>
             <div className="row" style={{ marginBottom: 10, gap: 6, flexWrap: "wrap" }}>
-              {drivePath.map((p, i) => (
-                <button
-                  key={`${p.id}-${i}`}
-                  className={`chip ${i === drivePath.length - 1 ? "on" : ""}`}
-                  onClick={() => jumpToPath(i)}
-                  disabled={driveBusy}
-                  title={p.name}
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
-            <div className="table-scroll docs-drive-table">
-            <table className="docs-table">
-              <thead>
-                <tr><th>Drive-Datei</th><th>Typ</th><th>Geändert</th><th className="num action-col">Aktion</th></tr>
-              </thead>
-              <tbody>
-                {driveFiles.slice(0, 20).map((f) => (
-                  <tr key={f.id}>
-                    <td>
-                      {f.mimeType === DRIVE_FOLDER_MIME ? (
-                        <button
-                          className="btn ghost small"
-                          onClick={() => openDriveFolder({ id: f.id, name: f.name })}
-                          disabled={driveBusy}
-                          title="Ordner öffnen"
-                        >
-                          <i className="fa-solid fa-folder-open" aria-hidden /> {f.name}
-                        </button>
-                      ) : (
-                        <a href={f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`} target="_blank" rel="noreferrer">{f.name}</a>
-                      )}
-                    </td>
-                    <td>{f.mimeType === DRIVE_FOLDER_MIME ? "Ordner" : (f.mimeType ?? "-")}</td>
-                    <td>{f.modifiedTime ? new Date(f.modifiedTime).toLocaleString("de-DE") : "-"}</td>
-                    <td className="num action-cell">
-                      <div className="action-stack">
-                      {f.mimeType !== DRIVE_FOLDER_MIME && (
-                        <>
-                          <button
-                            className="btn ghost small icon-only"
-                            aria-label="Datei herunterladen"
-                            title="Datei herunterladen"
-                            onClick={() => downloadDriveFile(f)}
-                            disabled={driveBusy}
-                          >
-                            <i className="fa-solid fa-download" aria-hidden />
-                            <span className="sr-only">Herunterladen</span>
-                          </button>{" "}
-                          <button
-                            className="btn ghost small icon-only"
-                            aria-label="Vorschau in App"
-                            title="Vorschau in App"
-                            onClick={() => openPreview(f)}
-                            disabled={driveBusy}
-                          >
-                            <i className="fa-solid fa-eye" aria-hidden />
-                            <span className="sr-only">Vorschau</span>
-                          </button>{" "}
-                          <button
-                            className="btn ghost small icon-only"
-                            aria-label="Drive-Datei importieren"
-                            title="Drive-Datei importieren"
-                            onClick={() => importDriveFile(f)}
-                            disabled={driveBusy}
-                          >
-                            <i className="fa-solid fa-file-import" aria-hidden />
-                            <span className="sr-only">Importieren</span>
-                          </button>
-                        </>
-                      )}
-                      </div>
-                    </td>
-                  </tr>
+              <div className="row" style={{ gap: 6, flexWrap: "wrap", flex: 1 }}>
+                {drivePath.map((p, i) => (
+                  <button
+                    key={`${p.id}-${i}`}
+                    className={`chip ${i === drivePath.length - 1 ? "on" : ""}`}
+                    onClick={() => jumpToPath(i)}
+                    disabled={driveBusy}
+                    title={p.name}
+                  >
+                    {p.name}
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              <div className="view-toggle" role="group" aria-label="Drive-Ansicht wechseln">
+                <button className={`btn ghost small icon-only ${driveViewMode === "list" ? "on" : ""}`} aria-label="Drive Listenansicht" title="Listenansicht" aria-pressed={driveViewMode === "list"} onClick={() => setDriveViewMode("list")}>
+                  <i className="fa-solid fa-list" aria-hidden />
+                  <span className="sr-only">Liste</span>
+                </button>
+                <button className={`btn ghost small icon-only ${driveViewMode === "grid" ? "on" : ""}`} aria-label="Drive Rasteransicht" title="Rasteransicht" aria-pressed={driveViewMode === "grid"} onClick={() => setDriveViewMode("grid")}>
+                  <i className="fa-solid fa-table-cells-large" aria-hidden />
+                  <span className="sr-only">Raster</span>
+                </button>
+              </div>
             </div>
+
+            {driveViewMode === "grid" ? (
+              <div className="docs-grid">
+                {driveFiles.slice(0, 20).map((f) => (
+                  <Fragment key={f.id}>
+                    <div className="doc-card">
+                      <div className="doc-card-preview">
+                        <i className={`fa-solid ${driveIconClass(f)}`} aria-hidden />
+                      </div>
+                      <div className="doc-card-body">
+                        {f.mimeType === DRIVE_FOLDER_MIME ? (
+                          <button
+                            className="btn ghost small"
+                            style={{ padding: 0, fontWeight: 700, border: "none", background: "none", display: "block", width: "100%", textAlign: "left", color: "var(--text)" }}
+                            onClick={() => openDriveFolder({ id: f.id, name: f.name })}
+                            disabled={driveBusy}
+                            title="Ordner öffnen"
+                          >
+                            {f.name}
+                          </button>
+                        ) : (
+                          <strong title={f.name}>{f.name}</strong>
+                        )}
+                        <div className="alert-msg">{f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString("de-DE") : "-"}</div>
+                      </div>
+                      {f.mimeType !== DRIVE_FOLDER_MIME && (
+                        <div className="action-stack doc-card-actions">{driveFileActions(f)}</div>
+                      )}
+                    </div>
+                    {previewFile?.id === f.id && (
+                      <div style={{ gridColumn: "1 / -1" }}>{drivePreviewBlock(previewFile)}</div>
+                    )}
+                  </Fragment>
+                ))}
+              </div>
+            ) : (
+              <div className="table-scroll docs-drive-table">
+              <table className="docs-table">
+                <thead>
+                  <tr><th>Drive-Datei</th><th>Typ</th><th>Geändert</th><th className="num action-col">Aktion</th></tr>
+                </thead>
+                <tbody>
+                  {driveFiles.slice(0, 20).map((f) => (
+                    <Fragment key={f.id}>
+                      <tr>
+                        <td>
+                          {f.mimeType === DRIVE_FOLDER_MIME ? (
+                            <button
+                              className="btn ghost small"
+                              onClick={() => openDriveFolder({ id: f.id, name: f.name })}
+                              disabled={driveBusy}
+                              title="Ordner öffnen"
+                            >
+                              <i className="fa-solid fa-folder-open" aria-hidden /> {f.name}
+                            </button>
+                          ) : (
+                            <a href={f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`} target="_blank" rel="noreferrer">{f.name}</a>
+                          )}
+                        </td>
+                        <td>{f.mimeType === DRIVE_FOLDER_MIME ? "Ordner" : (f.mimeType ?? "-")}</td>
+                        <td>{f.modifiedTime ? new Date(f.modifiedTime).toLocaleString("de-DE") : "-"}</td>
+                        <td className="num action-cell">
+                          <div className="action-stack">{driveFileActions(f)}</div>
+                        </td>
+                      </tr>
+                      {previewFile?.id === f.id && (
+                        <tr>
+                          <td colSpan={4}>{drivePreviewBlock(previewFile)}</td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+              </div>
+            )}
             {driveFiles.length > 20 && (
               <p className="auth-hint" style={{ marginTop: 8 }}>
                 Es werden 20 von {driveFiles.length} Drive-Dateien angezeigt. Mit Aktualisieren lädst du die aktuelle Liste neu.
               </p>
             )}
-          </div>
-        )}
-
-        {previewFile && (
-          <div style={{ marginTop: 14 }}>
-            <div className="row" style={{ marginBottom: 8 }}>
-              <strong>Vorschau: {previewFile.name}</strong>
-              <div className="spacer" />
-              <button
-                className="btn ghost small icon-only"
-                aria-label="Datei herunterladen"
-                title="Datei herunterladen"
-                onClick={() => downloadDriveFile(previewFile)}
-              >
-                <i className="fa-solid fa-download" aria-hidden />
-                <span className="sr-only">Datei herunterladen</span>
-              </button>{" "}
-              <a
-                className="btn ghost small icon-only"
-                href={previewFile.webViewLink || `https://drive.google.com/file/d/${previewFile.id}/view`}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="In Google Drive öffnen"
-                title="In Google Drive öffnen"
-              >
-                <i className="fa-solid fa-up-right-from-square" aria-hidden />
-                <span className="sr-only">In Google Drive öffnen</span>
-              </a>{" "}
-              <button className="btn ghost small icon-only" aria-label="Vorschau schließen" title="Vorschau schließen" onClick={() => setPreviewFile(null)}>
-                <i className="fa-solid fa-xmark" aria-hidden />
-                <span className="sr-only">Vorschau schließen</span>
-              </button>
-            </div>
-            <iframe
-              title={`Drive Vorschau ${previewFile.name}`}
-              src={`https://drive.google.com/file/d/${previewFile.id}/preview`}
-              style={{ width: "100%", minHeight: 420, border: "1px solid var(--line)", borderRadius: 10, background: "#fff" }}
-            />
-            <p className="auth-hint" style={{ marginTop: 8 }}>
-              Hinweis: Manche Dateitypen oder Freigaben erlauben keine eingebettete Vorschau. Dann bitte über das Öffnen-Symbol in Google Drive ansehen.
-            </p>
           </div>
         )}
       </div>

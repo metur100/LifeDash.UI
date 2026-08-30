@@ -774,6 +774,14 @@ textarea { min-height: 70px; resize: vertical; }
   justify-content: flex-end;
 }
 
+.drive-preview-inline {
+  padding: 14px;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--card) 92%, var(--bg));
+}
+
 .contracts-table {
   width: 100%;
   min-width: 0;

@@ -218,13 +218,31 @@ function addCadence(iso: string, cadence: string): string {
 function nextDueFromAnchor(anchorIso: string, cadence: string, fromIso = today()): string {
   if (cadence !== "monthly" && cadence !== "quarterly" && cadence !== "yearly") return anchorIso;
 
+  // Step from the original anchor each time (not from the previous result):
+  // if the anchor is the 31st, a short month like February clamps to the
+  // 28th/29th for that one month, but March still lands back on the 31st -
+  // stepping off the previous `due` instead would permanently drag the day
+  // down to whatever the shortest month in between clamped it to.
+  const anchor = parseIsoDate(anchorIso);
+  const step = cadence === "monthly" ? 1 : cadence === "quarterly" ? 3 : 12;
+
   let due = anchorIso;
+  let n = 0;
   let guard = 0;
   while (due < fromIso && guard < 240) {
-    due = addCadence(due, cadence);
+    n += 1;
+    due = addMonthsClamped(anchor, n * step).toISOString().slice(0, 10);
     guard += 1;
   }
   return due;
+}
+
+function nextFixedCostDue(dayOfMonth: number | null | undefined, billingDate: string | null, cadence: string): string | null {
+  if (!dayOfMonth) return null;
+  const anchor = billingDate ?? nextDateForDay(dayOfMonth);
+  return cadence === "monthly" || cadence === "quarterly" || cadence === "yearly"
+    ? nextDueFromAnchor(anchor, cadence)
+    : nextDateForDay(dayOfMonth);
 }
 
 function nextIncomeDate(i: Income, fromIso = today()): string | null {
@@ -350,11 +368,7 @@ export default function Finance() {
       .filter((c) => c.isActive && !!c.dayOfMonth)
       .map((c) => {
         const meta = parseFixedCostMeta(c.notes);
-        const fallbackAnchor = nextDateForDay(c.dayOfMonth as number);
-        const anchor = meta.billingDate ?? fallbackAnchor;
-        const dueOn = c.cadence === "monthly" || c.cadence === "quarterly" || c.cadence === "yearly"
-          ? nextDueFromAnchor(anchor, c.cadence)
-          : nextDateForDay(c.dayOfMonth as number);
+        const dueOn = nextFixedCostDue(c.dayOfMonth, meta.billingDate, c.cadence)!;
         return {
         key: `fixed-next-${c.id}`,
         source: "fixed" as const,
@@ -1066,10 +1080,10 @@ export default function Finance() {
                       <td className="hide-phone">
                         {(() => {
                           if (fixedMeta?.costType === "variable") return "Variable";
-                          const anchor = fixedMeta?.billingDate;
-                          if (!anchor || !line.dayOfMonth) return "kein Zahltag";
+                          const dueOn = nextFixedCostDue(line.dayOfMonth, fixedMeta?.billingDate ?? null, line.cadence);
+                          if (!dueOn) return "kein Zahltag";
                           const label = cadenceLabel[line.cadence] ?? line.cadence;
-                          return `${shortDate(anchor)} · ${label}`;
+                          return `${shortDate(dueOn)} · ${label}`;
                         })()}
                       </td>
                       <td className="num">{euro(monthly(line.amount, line.cadence), line.currency)}</td>
