@@ -9,7 +9,7 @@ import { useAsync } from "../lib/useAsync";
 const FLOW_TYPE_OPTIONS = [
   { value: "cost", label: "Kosten" },
   { value: "income", label: "Einnahme" },
-  { value: "none", label: "Keine Zahlung" },
+  { value: "none", label: "Keine" },
 ];
 
 function flowTypeLabel(flowType: string): string {
