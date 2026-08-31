@@ -1069,6 +1069,7 @@ export default function Family() {
               </div>
 
               {calendarCells.map((cell) => {
+                const isToday = cell.iso === today();
                 const items = apptByDay.get(cell.iso) ?? [];
                 const importantItems = importantByDay.get(cell.iso) ?? [];
                 const dayDistance = daysUntil(cell.iso) ?? 999;
@@ -1088,7 +1089,7 @@ export default function Family() {
                 return (
                   <div
                     key={cell.iso}
-                    className={`family-calendar-cell ${cell.inMonth ? "" : "out"} ${(items.length + importantItems.length) > 0 ? "has-items" : ""}`}
+                    className={`family-calendar-cell ${cell.inMonth ? "" : "out"} ${(items.length + importantItems.length) > 0 ? "has-items" : ""} ${isToday ? "today" : ""}`}
                     title={cellTitle}
                     role="button"
                     tabIndex={0}
@@ -1101,7 +1102,7 @@ export default function Family() {
                     }}
                   >
                     <div className="calendar-cell-head">
-                      <span className="day">{cell.day}</span>
+                      <span className="day">{cell.day}{isToday && <span className="sr-only"> (heute)</span>}</span>
                       {hasNearReminder && <span className="calendar-reminder-dot" title="Erinnerung in den nächsten 2 Tagen" />}
                     </div>
                     {importantItems.map((d) => (

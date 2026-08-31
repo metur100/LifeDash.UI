@@ -946,6 +946,16 @@ textarea { min-height: 70px; resize: vertical; }
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
+.family-calendar-cell.today {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+}
+
+.family-calendar-cell.today:hover,
+.family-calendar-cell.today:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 .calendar-cell-head {
   display: flex;
   align-items: center;
@@ -971,6 +981,18 @@ textarea { min-height: 70px; resize: vertical; }
 .family-calendar-cell .day {
   font-size: 12px;
   font-weight: 600;
+}
+
+.family-calendar-cell.today .day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
 }
 
 .family-calendar-cell .appt {
