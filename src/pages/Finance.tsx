@@ -963,7 +963,8 @@ export default function Finance() {
           {upcoming.length === 0 ? (
             <Empty title="Nichts offen." hint="Es gibt aktuell keine anstehenden Zahlungen." />
           ) : (
-            <div className="table-scroll finance-table-wrap">
+            <>
+            <div className="table-scroll finance-table-wrap rtable-desktop">
               <table className="finance-table">
                 <thead>
                   <tr>
@@ -1041,6 +1042,70 @@ export default function Finance() {
                 </tbody>
               </table>
             </div>
+
+            <div className="rtable-cards">
+              {upcoming.map((item) => {
+                const d = daysUntil(item.dueOn);
+                return (
+                  <div key={item.key} className="mobile-card">
+                    <div className="mobile-card-head">
+                      <strong>{item.title}</strong>
+                      <span className="badge">{euro(item.amount, item.currency)}</span>
+                    </div>
+                    <div className="alert-msg">
+                      {item.source === "payment"
+                        ? (cadenceLabel[parsePaymentMeta(item.payment?.notes, item.dueOn).cadence] ?? "einmalig")
+                        : `Fixkosten · ${cadenceLabel[item.cadence ?? "monthly"] ?? item.cadence}`}{" · "}{item.category}
+                    </div>
+                    <div className="mobile-card-grid">
+                      <span>
+                        Fällig: <strong>{shortDate(item.dueOn)}</strong>{" "}
+                        <span className={`badge ${d !== null && d < 0 ? "red" : d !== null && d <= 7 ? "amber" : ""}`}>
+                          {countdown(d)}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="action-stack mobile-card-actions">
+                      {item.source === "payment" ? (
+                        <>
+                          <button className="btn ghost small icon-only" aria-label="Als bezahlt markieren" title="Als bezahlt markieren" onClick={() => markPaid(item.payment as Payment)}>
+                            <i className="fa-solid fa-circle-check" aria-hidden />
+                            <span className="sr-only">Bezahlt</span>
+                          </button>
+                          <button className="btn ghost small icon-only" aria-label="Zahlung bearbeiten" title="Zahlung bearbeiten" onClick={() => editPayment(item.payment as Payment)}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>
+                          <button className="btn danger small icon-only" aria-label="Zahlung löschen" title="Zahlung löschen" onClick={() => removePayment(item.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn ghost small icon-only" aria-label="Als bezahlt markieren" title="Als bezahlt markieren" onClick={() => markProjectedPaid(item)}>
+                            <i className="fa-solid fa-circle-check" aria-hidden />
+                            <span className="sr-only">Bezahlt</span>
+                          </button>
+                          <button className="btn ghost small icon-only" aria-label="Fixkosten bearbeiten" title="Fixkosten bearbeiten" onClick={() => {
+                            const c = costById.get(item.id);
+                            if (c) void editCost(c);
+                          }}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>
+                          <button className="btn danger small icon-only" aria-label="Fixkosten löschen" title="Fixkosten löschen" onClick={() => removeCost(item.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            </>
           )}
         </div>
       </Section>
@@ -1055,7 +1120,7 @@ export default function Finance() {
         }
       >
         <div className="card">
-          <div className="table-scroll finance-table-wrap">
+          <div className="table-scroll finance-table-wrap rtable-desktop">
             <table className="finance-table">
               <thead>
                 <tr>
@@ -1116,6 +1181,53 @@ export default function Finance() {
               </tbody>
             </table>
           </div>
+
+          <div className="rtable-cards">
+            {costLines.map((line) => {
+              const fixedMeta = parseFixedCostMeta(costById.get(line.id)?.notes);
+              const paymentInfo = fixedMeta?.costType === "variable"
+                ? "Variable"
+                : (() => {
+                    const dueOn = nextFixedCostDue(line.dayOfMonth, fixedMeta?.billingDate ?? null, line.cadence);
+                    if (!dueOn) return "kein Zahltag";
+                    return `${shortDate(dueOn)} · ${cadenceLabel[line.cadence] ?? line.cadence}`;
+                  })();
+              return (
+                <div key={line.key} className="mobile-card">
+                  <div className="mobile-card-head">
+                    <strong>{line.name}</strong>
+                    <span className="badge">{euro(monthly(line.amount, line.cadence), line.currency)}/mtl.</span>
+                  </div>
+                  <div className="alert-msg">{line.category} · {line.isActive ? "aktiv" : "pausiert"}</div>
+                  <div className="mobile-card-grid">
+                    <span>Turnus: <strong>{cadenceLabel[line.cadence] ?? line.cadence}</strong></span>
+                    <span>Zahlungsinfo: {paymentInfo}</span>
+                    <span>Jahr: <strong>{euro(yearly(line.amount, line.cadence), line.currency)}</strong></span>
+                  </div>
+                  <div className="action-stack mobile-card-actions">
+                    <button className="btn ghost small icon-only" aria-label={line.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} title={line.isActive ? "Fixkosten pausieren" : "Fixkosten aktivieren"} onClick={() => {
+                      const c = costById.get(line.id);
+                      if (c) void toggleCost(c);
+                    }}>
+                      <i className={`fa-solid ${line.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
+                      <span className="sr-only">Status</span>
+                    </button>
+                    <button className="btn ghost small icon-only" aria-label="Fixkosten bearbeiten" title="Fixkosten bearbeiten" onClick={() => {
+                      const c = costById.get(line.id);
+                      if (c) void editCost(c);
+                    }}>
+                      <i className="fa-solid fa-pen-to-square" aria-hidden />
+                      <span className="sr-only">Bearbeiten</span>
+                    </button>
+                    <button className="btn danger small icon-only" aria-label="Fixkosten löschen" title="Fixkosten löschen" onClick={() => removeCost(line.id)}>
+                      <i className="fa-solid fa-trash" aria-hidden />
+                      <span className="sr-only">Löschen</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </Section>
 
@@ -1132,7 +1244,8 @@ export default function Finance() {
           {paid.length === 0 ? (
             <Empty title="Noch keine bezahlten Zahlungen." hint="Sobald du eine Zahlung als bezahlt markierst, erscheint sie hier." />
           ) : (
-            <div className="table-scroll finance-table-wrap">
+            <>
+            <div className="table-scroll finance-table-wrap rtable-desktop">
               <table className="finance-table">
                 <thead>
                   <tr>
@@ -1171,6 +1284,36 @@ export default function Finance() {
                 </tbody>
               </table>
             </div>
+
+            <div className="rtable-cards">
+              {paid.map((p) => (
+                <div key={p.id} className="mobile-card">
+                  <div className="mobile-card-head">
+                    <strong>{p.title}</strong>
+                    <span className="badge">{euro(p.amount, p.currency)}</span>
+                  </div>
+                  <div className="mobile-card-grid">
+                    <span>Fällig: {shortDate(p.dueOn)}</span>
+                    <span>Bezahlt am: {shortDate(p.paidOn)}</span>
+                  </div>
+                  <div className="action-stack mobile-card-actions">
+                    <button className="btn ghost small icon-only" aria-label="Als offen markieren" title="Als offen markieren" onClick={() => markUnpaid(p)}>
+                      <i className="fa-solid fa-rotate-left" aria-hidden />
+                      <span className="sr-only">Offen</span>
+                    </button>
+                    <button className="btn ghost small icon-only" aria-label="Zahlung bearbeiten" title="Zahlung bearbeiten" onClick={() => editPayment(p)}>
+                      <i className="fa-solid fa-pen-to-square" aria-hidden />
+                      <span className="sr-only">Bearbeiten</span>
+                    </button>
+                    <button className="btn danger small icon-only" aria-label="Zahlung löschen" title="Zahlung löschen" onClick={() => removePayment(p.id)}>
+                      <i className="fa-solid fa-trash" aria-hidden />
+                      <span className="sr-only">Löschen</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </Section>
@@ -1185,7 +1328,7 @@ export default function Finance() {
         }
       >
         <div className="card">
-          <div className="table-scroll finance-table-wrap">
+          <div className="table-scroll finance-table-wrap rtable-desktop">
             <table className="finance-table">
               <thead>
                 <tr>
@@ -1230,6 +1373,39 @@ export default function Finance() {
                 );})}
               </tbody>
             </table>
+          </div>
+
+          <div className="rtable-cards">
+            {(incomes.data ?? []).map((i) => {
+              const nextIncome = nextIncomeDate(i);
+              return (
+                <div key={i.id} className="mobile-card">
+                  <div className="mobile-card-head">
+                    <strong>{i.source}</strong>
+                    <span className="badge">{euro(monthly(i.amount, i.cadence), i.currency)}/mtl.</span>
+                  </div>
+                  <div className="alert-msg">{i.isActive ? "aktiv" : "pausiert"} · {cadenceLabel[i.cadence] ?? i.cadence}</div>
+                  <div className="mobile-card-grid">
+                    <span>Nächste Einnahme: {nextIncome ? shortDate(nextIncome) : "-"}</span>
+                    <span>Jahr: <strong>{euro(yearly(i.amount, i.cadence), i.currency)}</strong></span>
+                  </div>
+                  <div className="action-stack mobile-card-actions">
+                    <button className="btn ghost small icon-only" aria-label={i.isActive ? "Einnahme pausieren" : "Einnahme aktivieren"} title={i.isActive ? "Einnahme pausieren" : "Einnahme aktivieren"} onClick={() => toggleIncome(i)}>
+                      <i className={`fa-solid ${i.isActive ? "fa-toggle-on" : "fa-toggle-off"}`} aria-hidden />
+                      <span className="sr-only">Status</span>
+                    </button>
+                    <button className="btn ghost small icon-only" aria-label="Einnahme bearbeiten" title="Einnahme bearbeiten" onClick={() => editIncome(i)}>
+                      <i className="fa-solid fa-pen-to-square" aria-hidden />
+                      <span className="sr-only">Bearbeiten</span>
+                    </button>
+                    <button className="btn danger small icon-only" aria-label="Einnahme löschen" title="Einnahme löschen" onClick={() => removeIncome(i.id)}>
+                      <i className="fa-solid fa-trash" aria-hidden />
+                      <span className="sr-only">Löschen</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </Section>

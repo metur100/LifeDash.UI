@@ -149,34 +149,65 @@ export default function HomeItems() {
         <div className="card">
           {repairs.length === 0
             ? <Empty title="Nichts kaputt." hint="Trage eine Reparatur ein, damit sie nicht vergessen wird." />
-            : <table>
-                <thead><tr><th>Aufgabe</th><th>Raum</th><th>Termin</th><th className="num action-col">Aktion</th></tr></thead>
-                <tbody>
-                  {repairs.map((r) => (
-                    <tr key={r.id}>
-                      <td><strong>{r.title}</strong>{r.vendor && <div className="alert-msg">{r.vendor}</div>}</td>
-                      <td>{r.room ?? "—"}</td>
-                      <td>{r.scheduledOn ? `${shortDate(r.scheduledOn)} · ${countdown(daysUntil(r.scheduledOn))}` : "offen"}</td>
-                      <td className="num action-cell">
-                        <div className="action-stack">
-                        <button className="btn ghost small icon-only" aria-label="Als erledigt markieren" title="Als erledigt markieren" onClick={() => complete(r)}>
-                          <i className="fa-solid fa-check" aria-hidden />
-                          <span className="sr-only">Erledigt</span>
-                        </button>{" "}
-                        <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editItem(r)}>
-                          <i className="fa-solid fa-pen-to-square" aria-hidden />
-                          <span className="sr-only">Bearbeiten</span>
-                        </button>{" "}
-                        <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeItem(r.id)}>
-                          <i className="fa-solid fa-trash" aria-hidden />
-                          <span className="sr-only">Löschen</span>
-                        </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>}
+            : <>
+              <div className="table-scroll rtable-desktop">
+                <table>
+                  <thead><tr><th>Aufgabe</th><th>Raum</th><th>Termin</th><th className="num action-col">Aktion</th></tr></thead>
+                  <tbody>
+                    {repairs.map((r) => (
+                      <tr key={r.id}>
+                        <td><strong>{r.title}</strong>{r.vendor && <div className="alert-msg">{r.vendor}</div>}</td>
+                        <td>{r.room ?? "—"}</td>
+                        <td>{r.scheduledOn ? `${shortDate(r.scheduledOn)} · ${countdown(daysUntil(r.scheduledOn))}` : "offen"}</td>
+                        <td className="num action-cell">
+                          <div className="action-stack">
+                          <button className="btn ghost small icon-only" aria-label="Als erledigt markieren" title="Als erledigt markieren" onClick={() => complete(r)}>
+                            <i className="fa-solid fa-check" aria-hidden />
+                            <span className="sr-only">Erledigt</span>
+                          </button>{" "}
+                          <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editItem(r)}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>{" "}
+                          <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeItem(r.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="rtable-cards">
+                {repairs.map((r) => (
+                  <div key={`m-${r.id}`} className="mobile-card">
+                    <div className="mobile-card-head">
+                      <strong>{r.title}</strong>
+                      <span className="badge">{r.room ?? "—"}</span>
+                    </div>
+                    {r.vendor && <div className="alert-msg">{r.vendor}</div>}
+                    <div className="alert-msg">Termin: {r.scheduledOn ? `${shortDate(r.scheduledOn)} · ${countdown(daysUntil(r.scheduledOn))}` : "offen"}</div>
+                    <div className="action-stack mobile-card-actions">
+                      <button className="btn ghost small icon-only" aria-label="Als erledigt markieren" title="Als erledigt markieren" onClick={() => complete(r)}>
+                        <i className="fa-solid fa-check" aria-hidden />
+                        <span className="sr-only">Erledigt</span>
+                      </button>
+                      <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editItem(r)}>
+                        <i className="fa-solid fa-pen-to-square" aria-hidden />
+                        <span className="sr-only">Bearbeiten</span>
+                      </button>
+                      <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeItem(r.id)}>
+                        <i className="fa-solid fa-trash" aria-hidden />
+                        <span className="sr-only">Löschen</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>}
 
         </div>
       </Section>
@@ -186,66 +217,127 @@ export default function HomeItems() {
           <div className="card">
             {warranties.length === 0
               ? <Empty title="Keine Garantien erfasst." hint="Kaufdatum und Garantieende eintragen lohnt sich." />
-              : <table>
-                  <thead><tr><th>Garantie</th><th className="num">Status</th><th className="num action-col">Aktion</th></tr></thead>
-                  <tbody>
-                    {warranties.map((w) => {
-                      const d = daysUntil(w.warrantyUntil);
-                      return (
-                        <tr key={w.id}>
-                          <td><strong>{w.title}</strong><div className="alert-msg">{w.vendor ?? w.room ?? ""}</div></td>
-                          <td className="num">
-                            {w.warrantyUntil
-                              ? <span className={`badge ${d !== null && d < 0 ? "red" : d !== null && d <= 60 ? "amber" : "green"}`}>
-                                  {d !== null && d < 0 ? "abgelaufen" : countdown(d)}
-                                </span>
-                              : <span className="badge">ohne Datum</span>}
-                          </td>
+              : <>
+                <div className="table-scroll rtable-desktop">
+                  <table>
+                    <thead><tr><th>Garantie</th><th className="num">Status</th><th className="num action-col">Aktion</th></tr></thead>
+                    <tbody>
+                      {warranties.map((w) => {
+                        const d = daysUntil(w.warrantyUntil);
+                        return (
+                          <tr key={w.id}>
+                            <td><strong>{w.title}</strong><div className="alert-msg">{w.vendor ?? w.room ?? ""}</div></td>
+                            <td className="num">
+                              {w.warrantyUntil
+                                ? <span className={`badge ${d !== null && d < 0 ? "red" : d !== null && d <= 60 ? "amber" : "green"}`}>
+                                    {d !== null && d < 0 ? "abgelaufen" : countdown(d)}
+                                  </span>
+                                : <span className="badge">ohne Datum</span>}
+                            </td>
+                            <td className="num action-cell">
+                              <div className="action-stack">
+                              <button className="btn ghost small icon-only" aria-label="Garantie bearbeiten" title="Garantie bearbeiten" onClick={() => editItem(w)}>
+                                <i className="fa-solid fa-pen-to-square" aria-hidden />
+                                <span className="sr-only">Bearbeiten</span>
+                              </button>{" "}
+                              <button className="btn danger small icon-only" aria-label="Garantie löschen" title="Garantie löschen" onClick={() => removeItem(w.id)}>
+                                <i className="fa-solid fa-trash" aria-hidden />
+                                <span className="sr-only">Löschen</span>
+                              </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="rtable-cards">
+                  {warranties.map((w) => {
+                    const d = daysUntil(w.warrantyUntil);
+                    return (
+                      <div key={`m-${w.id}`} className="mobile-card">
+                        <div className="mobile-card-head">
+                          <strong>{w.title}</strong>
+                          {w.warrantyUntil
+                            ? <span className={`badge ${d !== null && d < 0 ? "red" : d !== null && d <= 60 ? "amber" : "green"}`}>
+                                {d !== null && d < 0 ? "abgelaufen" : countdown(d)}
+                              </span>
+                            : <span className="badge">ohne Datum</span>}
+                        </div>
+                        <div className="alert-msg">{w.vendor ?? w.room ?? ""}</div>
+                        <div className="action-stack mobile-card-actions">
+                          <button className="btn ghost small icon-only" aria-label="Garantie bearbeiten" title="Garantie bearbeiten" onClick={() => editItem(w)}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>
+                          <button className="btn danger small icon-only" aria-label="Garantie löschen" title="Garantie löschen" onClick={() => removeItem(w.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>}
+          </div>
+        </Section>
+
+        <Section title="Anschaffungen">
+          <div className="card">
+            {purchases.length === 0
+              ? <Empty title="Noch keine Anschaffungen." hint="Trage größere Käufe ein, um sie im Blick zu behalten." />
+              : <>
+                <div className="table-scroll rtable-desktop">
+                  <table>
+                    <thead><tr><th>Anschaffung</th><th className="num">Betrag</th><th className="num action-col">Aktion</th></tr></thead>
+                    <tbody>
+                      {purchases.map((p) => (
+                        <tr key={p.id}>
+                          <td><strong>{p.title}</strong><div className="alert-msg">{shortDate(p.purchasedOn)}</div></td>
+                          <td className="num">{p.cost ? euro(p.cost, p.currency) : "—"}</td>
                           <td className="num action-cell">
                             <div className="action-stack">
-                            <button className="btn ghost small icon-only" aria-label="Garantie bearbeiten" title="Garantie bearbeiten" onClick={() => editItem(w)}>
+                            <button className="btn ghost small icon-only" aria-label="Anschaffung bearbeiten" title="Anschaffung bearbeiten" onClick={() => editItem(p)}>
                               <i className="fa-solid fa-pen-to-square" aria-hidden />
                               <span className="sr-only">Bearbeiten</span>
                             </button>{" "}
-                            <button className="btn danger small icon-only" aria-label="Garantie löschen" title="Garantie löschen" onClick={() => removeItem(w.id)}>
+                            <button className="btn danger small icon-only" aria-label="Anschaffung löschen" title="Anschaffung löschen" onClick={() => removeItem(p.id)}>
                               <i className="fa-solid fa-trash" aria-hidden />
                               <span className="sr-only">Löschen</span>
                             </button>
                             </div>
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>}
-          </div>
-        </Section>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-        <Section title="Anschaffungen">
-          <div className="card">
-            <table>
-              <thead><tr><th>Anschaffung</th><th className="num">Betrag</th><th className="num action-col">Aktion</th></tr></thead>
-              <tbody>
-                {purchases.map((p) => (
-                  <tr key={p.id}>
-                    <td><strong>{p.title}</strong><div className="alert-msg">{shortDate(p.purchasedOn)}</div></td>
-                    <td className="num">{p.cost ? euro(p.cost, p.currency) : "—"}</td>
-                    <td className="num action-cell">
-                      <div className="action-stack">
-                      <button className="btn ghost small icon-only" aria-label="Anschaffung bearbeiten" title="Anschaffung bearbeiten" onClick={() => editItem(p)}>
-                        <i className="fa-solid fa-pen-to-square" aria-hidden />
-                        <span className="sr-only">Bearbeiten</span>
-                      </button>{" "}
-                      <button className="btn danger small icon-only" aria-label="Anschaffung löschen" title="Anschaffung löschen" onClick={() => removeItem(p.id)}>
-                        <i className="fa-solid fa-trash" aria-hidden />
-                        <span className="sr-only">Löschen</span>
-                      </button>
+                <div className="rtable-cards">
+                  {purchases.map((p) => (
+                    <div key={`m-${p.id}`} className="mobile-card">
+                      <div className="mobile-card-head">
+                        <strong>{p.title}</strong>
+                        <span className="badge">{p.cost ? euro(p.cost, p.currency) : "—"}</span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <div className="alert-msg">{shortDate(p.purchasedOn)}</div>
+                      <div className="action-stack mobile-card-actions">
+                        <button className="btn ghost small icon-only" aria-label="Anschaffung bearbeiten" title="Anschaffung bearbeiten" onClick={() => editItem(p)}>
+                          <i className="fa-solid fa-pen-to-square" aria-hidden />
+                          <span className="sr-only">Bearbeiten</span>
+                        </button>
+                        <button className="btn danger small icon-only" aria-label="Anschaffung löschen" title="Anschaffung löschen" onClick={() => removeItem(p.id)}>
+                          <i className="fa-solid fa-trash" aria-hidden />
+                          <span className="sr-only">Löschen</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>}
           </div>
         </Section>
       </div>
@@ -254,30 +346,56 @@ export default function HomeItems() {
         <div className="card">
           {doneItems.length === 0
             ? <Empty title="Noch nichts abgeschlossen." hint="Als erledigt markierte Einträge erscheinen hier." />
-            : <table>
-                <thead><tr><th>Eintrag</th><th>Art</th><th>Status</th><th className="num action-col">Aktion</th></tr></thead>
-                <tbody>
-                  {doneItems.map((d) => (
-                    <tr key={d.id}>
-                      <td><strong>{d.title}</strong><div className="alert-msg">{d.room ?? d.vendor ?? ""}</div></td>
-                      <td>{d.kind}</td>
-                      <td><span className="badge green">done</span></td>
-                      <td className="num action-cell">
-                        <div className="action-stack">
-                        <button className="btn ghost small icon-only" aria-label="Wieder öffnen" title="Wieder öffnen" onClick={() => reopen(d)}>
-                          <i className="fa-solid fa-rotate-left" aria-hidden />
-                          <span className="sr-only">Wieder öffnen</span>
-                        </button>{" "}
-                        <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeItem(d.id)}>
-                          <i className="fa-solid fa-trash" aria-hidden />
-                          <span className="sr-only">Löschen</span>
-                        </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>}
+            : <>
+              <div className="table-scroll rtable-desktop">
+                <table>
+                  <thead><tr><th>Eintrag</th><th>Art</th><th>Status</th><th className="num action-col">Aktion</th></tr></thead>
+                  <tbody>
+                    {doneItems.map((d) => (
+                      <tr key={d.id}>
+                        <td><strong>{d.title}</strong><div className="alert-msg">{d.room ?? d.vendor ?? ""}</div></td>
+                        <td>{d.kind}</td>
+                        <td><span className="badge green">done</span></td>
+                        <td className="num action-cell">
+                          <div className="action-stack">
+                          <button className="btn ghost small icon-only" aria-label="Wieder öffnen" title="Wieder öffnen" onClick={() => reopen(d)}>
+                            <i className="fa-solid fa-rotate-left" aria-hidden />
+                            <span className="sr-only">Wieder öffnen</span>
+                          </button>{" "}
+                          <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeItem(d.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="rtable-cards">
+                {doneItems.map((d) => (
+                  <div key={`m-${d.id}`} className="mobile-card">
+                    <div className="mobile-card-head">
+                      <strong>{d.title}</strong>
+                      <span className="badge green">done</span>
+                    </div>
+                    <div className="alert-msg">{d.kind}{d.room || d.vendor ? ` · ${d.room ?? d.vendor}` : ""}</div>
+                    <div className="action-stack mobile-card-actions">
+                      <button className="btn ghost small icon-only" aria-label="Wieder öffnen" title="Wieder öffnen" onClick={() => reopen(d)}>
+                        <i className="fa-solid fa-rotate-left" aria-hidden />
+                        <span className="sr-only">Wieder öffnen</span>
+                      </button>
+                      <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeItem(d.id)}>
+                        <i className="fa-solid fa-trash" aria-hidden />
+                        <span className="sr-only">Löschen</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>}
         </div>
       </Section>
     </>

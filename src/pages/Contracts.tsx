@@ -193,7 +193,7 @@ export default function Contracts() {
         {rows.length === 0
           ? <Empty title="Noch keine Verträge." hint="Lege Verträge mit Startdatum, Enddatum und Kündigungsfrist an — auch solche ohne Zahlung, z.B. einen Betreuungsvertrag." />
           : <div className="card">
-              <div className="table-scroll contracts-scroll contracts-desktop">
+              <div className="table-scroll contracts-scroll rtable-desktop">
                 <table className="contracts-table">
                   <thead><tr><th>Vertrag</th><th>Art</th><th>Person</th><th className="num">Betrag</th><th>Turnus</th><th>Startdatum</th><th>Enddatum</th><th>Kündigen bis</th><th>Hinweis</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
@@ -226,21 +226,21 @@ export default function Contracts() {
                 </table>
               </div>
 
-              <div className="contracts-mobile">
+              <div className="rtable-cards">
                 {rows.map(({ s, memberName }) => (
-                  <div key={`m-${s.id}`} className="contracts-mobile-card">
-                    <div className="contracts-mobile-head">
+                  <div key={`m-${s.id}`} className="mobile-card">
+                    <div className="mobile-card-head">
                       <strong>{s.name}</strong>
                       <span className="badge">{s.flowType === "none" ? flowTypeLabel(s.flowType) : euro(s.amount ?? 0, s.currency)}</span>
                     </div>
                     <div className="alert-msg">{flowTypeLabel(s.flowType)} · {memberName}{s.flowType !== "none" ? ` · ${cadenceLabel(s.cadence)}` : ""}</div>
-                    <div className="contracts-mobile-grid">
+                    <div className="mobile-card-grid">
                       <span>Start: {shortDate(s.startOn)}</span>
                       <span>Ende: {shortDate(s.endOn)}</span>
                       <span>Kündigen bis: {shortDate(s.cancelByOn)}</span>
                       <span>Hinweis: {s.noticeText || "-"}</span>
                     </div>
-                    <div className="action-stack contracts-mobile-actions">
+                    <div className="action-stack mobile-card-actions">
                       <button className="btn ghost small icon-only" aria-label="Vertrag bearbeiten" title="Vertrag bearbeiten" onClick={() => editContract(s)}>
                         <i className="fa-solid fa-pen-to-square" aria-hidden />
                         <span className="sr-only">Bearbeiten</span>

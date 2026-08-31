@@ -360,6 +360,14 @@ function appointmentTooltip(a: Appointment, memberNameById: Map<number, string>)
   return lines.join("\n");
 }
 
+function importantCadenceLabel(d: ImportantDate): string {
+  const cadence = importantCadence(d);
+  if (cadence === "monthly") return "monatlich";
+  if (cadence === "quarterly") return "quartalsweise";
+  if (cadence === "semiannual") return "alle 6 Monate";
+  return "jährlich";
+}
+
 function importantDateTooltip(d: ImportantDate, occurrenceIso: string): string {
   const cadence = importantCadence(d);
   const cadenceLabel = cadence === "monthly"
@@ -949,45 +957,82 @@ export default function Family() {
       <ErrorBar message={error ?? members.error ?? appts.error} />
 
       <Section title="Personen" action={<button className="btn icon-only" aria-label="Person hinzufügen" title="Person hinzufügen" onClick={addMember}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Person hinzufügen</span></button>}>
-        <div className="card">
-          <table>
-            <thead><tr><th>Name</th><th>Rolle</th><th>Geburtstag</th><th className="num action-col">Aktion</th></tr></thead>
-            <tbody>
-              {(members.data ?? []).map((m) => (
-                <tr key={m.id}>
-                  <td><strong>{m.fullName}</strong></td>
-                  <td>{m.relation ?? "—"}</td>
-                  <td>{shortDate(m.birthDate)}</td>
-                  <td className="num action-cell">
-                    <div className="action-stack">
-                    <button
-                      className="btn ghost small icon-only"
-                      aria-label="Personendetails"
-                      title="Personendetails"
-                      onClick={() => {
-                        setCopiedField(null);
-                        setDetailsMember(m);
-                      }}
-                    >
-                      <i className="fa-solid fa-circle-info" aria-hidden />
-                      <span className="sr-only">Personendetails</span>
-                    </button>{" "}
-                    <button className="btn ghost small icon-only" aria-label="Person bearbeiten" title="Person bearbeiten" onClick={() => editMember(m)}>
-                      <i className="fa-solid fa-pen-to-square" aria-hidden />
-                      <span className="sr-only">Bearbeiten</span>
-                    </button>{" "}
-                    <button className="btn danger small icon-only" aria-label="Person löschen" title="Person löschen" onClick={() => removeMember(m.id)}>
-                      <i className="fa-solid fa-trash" aria-hidden />
-                      <span className="sr-only">Löschen</span>
-                    </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {(members.data ?? []).length === 0
+          ? <Empty title="Noch keine Personen." hint="Lege Familienmitglieder an, um Termine und Dokumente zuzuordnen." />
+          : <div className="card">
+              <div className="table-scroll rtable-desktop">
+                <table>
+                  <thead><tr><th>Name</th><th>Rolle</th><th>Geburtstag</th><th className="num action-col">Aktion</th></tr></thead>
+                  <tbody>
+                    {(members.data ?? []).map((m) => (
+                      <tr key={m.id}>
+                        <td><strong>{m.fullName}</strong></td>
+                        <td>{m.relation ?? "—"}</td>
+                        <td>{shortDate(m.birthDate)}</td>
+                        <td className="num action-cell">
+                          <div className="action-stack">
+                          <button
+                            className="btn ghost small icon-only"
+                            aria-label="Personendetails"
+                            title="Personendetails"
+                            onClick={() => {
+                              setCopiedField(null);
+                              setDetailsMember(m);
+                            }}
+                          >
+                            <i className="fa-solid fa-circle-info" aria-hidden />
+                            <span className="sr-only">Personendetails</span>
+                          </button>{" "}
+                          <button className="btn ghost small icon-only" aria-label="Person bearbeiten" title="Person bearbeiten" onClick={() => editMember(m)}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>{" "}
+                          <button className="btn danger small icon-only" aria-label="Person löschen" title="Person löschen" onClick={() => removeMember(m.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-        </div>
+              <div className="rtable-cards">
+                {(members.data ?? []).map((m) => (
+                  <div key={`m-${m.id}`} className="mobile-card">
+                    <div className="mobile-card-head">
+                      <strong>{m.fullName}</strong>
+                      <span className="badge">{m.relation ?? "—"}</span>
+                    </div>
+                    <div className="alert-msg">Geburtstag: {shortDate(m.birthDate)}</div>
+                    <div className="action-stack mobile-card-actions">
+                      <button
+                        className="btn ghost small icon-only"
+                        aria-label="Personendetails"
+                        title="Personendetails"
+                        onClick={() => {
+                          setCopiedField(null);
+                          setDetailsMember(m);
+                        }}
+                      >
+                        <i className="fa-solid fa-circle-info" aria-hidden />
+                        <span className="sr-only">Personendetails</span>
+                      </button>
+                      <button className="btn ghost small icon-only" aria-label="Person bearbeiten" title="Person bearbeiten" onClick={() => editMember(m)}>
+                        <i className="fa-solid fa-pen-to-square" aria-hidden />
+                        <span className="sr-only">Bearbeiten</span>
+                      </button>
+                      <button className="btn danger small icon-only" aria-label="Person löschen" title="Person löschen" onClick={() => removeMember(m.id)}>
+                        <i className="fa-solid fa-trash" aria-hidden />
+                        <span className="sr-only">Löschen</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>}
       </Section>
 
       <div className="grid-2">
@@ -1117,71 +1162,59 @@ export default function Family() {
           {upcoming.length === 0
             ? <Empty title="Keine offenen Termine." hint="Neue Termine erscheinen hier, sobald du sie anlegst." />
             : <div className="card">
-                <table>
-                  <tbody>
-                    {upcoming.map((a) => (
-                      <tr key={a.id}>
-                        <td>
-                          <strong>{a.title}</strong>
-                          <div className="alert-msg">
-                            {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
-                            {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
-                          </div>
-                        </td>
-                        <td className="num">
-                          <span className="badge">{countdown(daysUntil(a.startsAt.slice(0, 10)))}</span>
-                        </td>
-                        <td className="num action-cell">
-                          <div className="action-stack">
-                          <button className="btn ghost small icon-only" aria-label="Termin als erledigt markieren" title="Termin als erledigt markieren" onClick={() => completeAppointment(a)}>
-                            <i className="fa-solid fa-check" aria-hidden />
-                            <span className="sr-only">Erledigt</span>
-                          </button>
-                          <button className="btn ghost small icon-only" aria-label="Termin bearbeiten" title="Termin bearbeiten" onClick={() => editAppointment(a)}>
-                            <i className="fa-solid fa-pen-to-square" aria-hidden />
-                            <span className="sr-only">Bearbeiten</span>
-                          </button>{" "}
-                          <button className="btn danger small icon-only" aria-label="Termin löschen" title="Termin löschen" onClick={() => removeAppointment(a.id)}>
-                            <i className="fa-solid fa-trash" aria-hidden />
-                            <span className="sr-only">Löschen</span>
-                          </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>}
-          {doneAppointments.length > 0 && (
-            <div className="card" style={{ marginTop: 12 }}>
-              <strong>Erledigte Termine</strong>
-              <table style={{ marginTop: 8 }}>
-                <tbody>
-                  {doneAppointments.map((a) => (
-                    <tr key={a.id}>
-                      <td>
+                <div className="card-list">
+                  {upcoming.map((a) => (
+                    <div key={a.id} className="mobile-card">
+                      <div className="mobile-card-head">
                         <strong>{a.title}</strong>
-                          <div className="alert-msg">
-                            {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
-                            {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
-                          </div>
-                      </td>
-                      <td className="num action-cell">
-                        <div className="action-stack">
-                        <button className="btn ghost small icon-only" aria-label="Termin wieder öffnen" title="Termin wieder öffnen" onClick={() => reopenAppointment(a)}>
-                          <i className="fa-solid fa-rotate-left" aria-hidden />
-                          <span className="sr-only">Wieder öffnen</span>
-                        </button>{" "}
+                        <span className="badge">{countdown(daysUntil(a.startsAt.slice(0, 10)))}</span>
+                      </div>
+                      <div className="alert-msg">
+                        {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
+                        {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
+                      </div>
+                      <div className="action-stack mobile-card-actions">
+                        <button className="btn ghost small icon-only" aria-label="Termin als erledigt markieren" title="Termin als erledigt markieren" onClick={() => completeAppointment(a)}>
+                          <i className="fa-solid fa-check" aria-hidden />
+                          <span className="sr-only">Erledigt</span>
+                        </button>
+                        <button className="btn ghost small icon-only" aria-label="Termin bearbeiten" title="Termin bearbeiten" onClick={() => editAppointment(a)}>
+                          <i className="fa-solid fa-pen-to-square" aria-hidden />
+                          <span className="sr-only">Bearbeiten</span>
+                        </button>
                         <button className="btn danger small icon-only" aria-label="Termin löschen" title="Termin löschen" onClick={() => removeAppointment(a.id)}>
                           <i className="fa-solid fa-trash" aria-hidden />
                           <span className="sr-only">Löschen</span>
                         </button>
-                        </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </div>}
+          {doneAppointments.length > 0 && (
+            <div className="card" style={{ marginTop: 12 }}>
+              <strong>Erledigte Termine</strong>
+              <div className="card-list" style={{ marginTop: 10 }}>
+                {doneAppointments.map((a) => (
+                  <div key={a.id} className="mobile-card">
+                    <strong>{a.title}</strong>
+                    <div className="alert-msg">
+                      {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
+                      {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
+                    </div>
+                    <div className="action-stack mobile-card-actions">
+                      <button className="btn ghost small icon-only" aria-label="Termin wieder öffnen" title="Termin wieder öffnen" onClick={() => reopenAppointment(a)}>
+                        <i className="fa-solid fa-rotate-left" aria-hidden />
+                        <span className="sr-only">Wieder öffnen</span>
+                      </button>
+                      <button className="btn danger small icon-only" aria-label="Termin löschen" title="Termin löschen" onClick={() => removeAppointment(a.id)}>
+                        <i className="fa-solid fa-trash" aria-hidden />
+                        <span className="sr-only">Löschen</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </Section>
@@ -1191,32 +1224,59 @@ export default function Family() {
         {(dates.data ?? []).length === 0
           ? <Empty title="Noch keine wichtigen Anlässe." hint="Geburtstage, Jahrestage und weitere wiederkehrende Anlässe erscheinen hier." />
           : <div className="card">
-              <table>
-                <thead><tr><th>Anlass</th><th>Kategorie</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
-                <tbody>
-                  {(dates.data ?? []).map((d) => (
-                    <tr key={d.id}>
-                      <td><strong>{d.title}</strong></td>
-                      <td><span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category)}</span></td>
-                      <td>{shortDate(d.dateValue)}</td>
-                      <td>{importantCadence(d) === "monthly" ? "monatlich" : importantCadence(d) === "quarterly" ? "quartalsweise" : importantCadence(d) === "semiannual" ? "alle 6 Monate" : "jährlich"}</td>
-                      <td className="num">{countdown(daysUntil(nextImportantOccurrence(d)))}</td>
-                      <td className="num action-cell">
-                        <div className="action-stack">
-                        <button className="btn ghost small icon-only" aria-label="Datum bearbeiten" title="Datum bearbeiten" onClick={() => editDate(d)}>
-                          <i className="fa-solid fa-pen-to-square" aria-hidden />
-                          <span className="sr-only">Bearbeiten</span>
-                        </button>{" "}
-                        <button className="btn danger small icon-only" aria-label="Datum löschen" title="Datum löschen" onClick={() => removeDate(d.id)}>
-                          <i className="fa-solid fa-trash" aria-hidden />
-                          <span className="sr-only">Löschen</span>
-                        </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-scroll rtable-desktop">
+                <table>
+                  <thead><tr><th>Anlass</th><th>Kategorie</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
+                  <tbody>
+                    {(dates.data ?? []).map((d) => (
+                      <tr key={d.id}>
+                        <td><strong>{d.title}</strong></td>
+                        <td><span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category)}</span></td>
+                        <td>{shortDate(d.dateValue)}</td>
+                        <td>{importantCadenceLabel(d)}</td>
+                        <td className="num">{countdown(daysUntil(nextImportantOccurrence(d)))}</td>
+                        <td className="num action-cell">
+                          <div className="action-stack">
+                          <button className="btn ghost small icon-only" aria-label="Datum bearbeiten" title="Datum bearbeiten" onClick={() => editDate(d)}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>{" "}
+                          <button className="btn danger small icon-only" aria-label="Datum löschen" title="Datum löschen" onClick={() => removeDate(d.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="rtable-cards">
+                {(dates.data ?? []).map((d) => (
+                  <div key={`m-${d.id}`} className="mobile-card">
+                    <div className="mobile-card-head">
+                      <strong>{d.title}</strong>
+                      <span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category)}</span>
+                    </div>
+                    <div className="alert-msg">{shortDate(d.dateValue)} · {importantCadenceLabel(d)}</div>
+                    <div className="mobile-card-grid">
+                      <span>Countdown: <strong>{countdown(daysUntil(nextImportantOccurrence(d)))}</strong></span>
+                    </div>
+                    <div className="action-stack mobile-card-actions">
+                      <button className="btn ghost small icon-only" aria-label="Datum bearbeiten" title="Datum bearbeiten" onClick={() => editDate(d)}>
+                        <i className="fa-solid fa-pen-to-square" aria-hidden />
+                        <span className="sr-only">Bearbeiten</span>
+                      </button>
+                      <button className="btn danger small icon-only" aria-label="Datum löschen" title="Datum löschen" onClick={() => removeDate(d.id)}>
+                        <i className="fa-solid fa-trash" aria-hidden />
+                        <span className="sr-only">Löschen</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>}
       </Section>
 

@@ -760,7 +760,8 @@ export default function Documents() {
                 ))}
               </div>
             ) : (
-              <div className="table-scroll docs-drive-table">
+              <>
+              <div className="table-scroll docs-drive-table rtable-desktop">
               <table className="docs-table">
                 <thead>
                   <tr><th>Drive-Datei</th><th>Typ</th><th>Geändert</th><th className="num action-col">Aktion</th></tr>
@@ -799,6 +800,37 @@ export default function Documents() {
                 </tbody>
               </table>
               </div>
+
+              <div className="rtable-cards">
+                {driveFiles.slice(0, 20).map((f) => (
+                  <Fragment key={f.id}>
+                    <div className="mobile-card">
+                      <div className="mobile-card-head">
+                        {f.mimeType === DRIVE_FOLDER_MIME ? (
+                          <button
+                            className="btn ghost small"
+                            style={{ padding: 0, border: "none", background: "none", fontWeight: 700, color: "var(--text)" }}
+                            onClick={() => openDriveFolder({ id: f.id, name: f.name })}
+                            disabled={driveBusy}
+                            title="Ordner öffnen"
+                          >
+                            <i className="fa-solid fa-folder-open" aria-hidden /> {f.name}
+                          </button>
+                        ) : (
+                          <a href={f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`} target="_blank" rel="noreferrer"><strong>{f.name}</strong></a>
+                        )}
+                      </div>
+                      <div className="alert-msg">
+                        {f.mimeType === DRIVE_FOLDER_MIME ? "Ordner" : (f.mimeType ?? "-")}
+                        {f.modifiedTime ? ` · ${new Date(f.modifiedTime).toLocaleString("de-DE")}` : ""}
+                      </div>
+                      <div className="action-stack mobile-card-actions">{driveFileActions(f)}</div>
+                    </div>
+                    {previewFile?.id === f.id && drivePreviewBlock(previewFile)}
+                  </Fragment>
+                ))}
+              </div>
+              </>
             )}
             {driveFiles.length > 20 && (
               <p className="auth-hint" style={{ marginTop: 8 }}>
@@ -877,7 +909,8 @@ export default function Documents() {
                 );
               })}
             </div>
-          ) : <div className="table-scroll docs-main-table"><table className="docs-table">
+          ) : <>
+            <div className="table-scroll docs-main-table rtable-desktop"><table className="docs-table">
               <thead>
                 <tr><th>Dokument</th><th>Kategorie</th><th>Läuft ab</th><th>Datei</th><th className="num action-col">Aktion</th></tr>
               </thead>
@@ -920,7 +953,47 @@ export default function Documents() {
                   );
                 })}
               </tbody>
-            </table></div>}
+            </table></div>
+
+            <div className="rtable-cards">
+              {list.map((d) => {
+                const days = daysUntil(d.expiresOn);
+                return (
+                  <div key={d.id} className="mobile-card">
+                    <div className="mobile-card-head">
+                      <strong>{d.title}</strong>
+                      <span className="badge">{categoryLabels[d.category] ?? d.category}</span>
+                    </div>
+                    {d.documentType && <div className="alert-msg">{d.documentType}</div>}
+                    <div className="mobile-card-grid">
+                      <span>Läuft ab: {d.expiresOn
+                        ? <span className={`badge ${days !== null && days < 0 ? "red" : days !== null && days <= 60 ? "amber" : "green"}`}>
+                            {shortDate(d.expiresOn)} · {countdown(days)}
+                          </span>
+                        : "unbefristet"}</span>
+                      <span>Datei: {d.originalName
+                        ? <a href={api.fileUrl(d.id)} target="_blank" rel="noreferrer">{d.originalName}</a>
+                        : "keine Datei"}</span>
+                    </div>
+                    <div className="action-stack mobile-card-actions">
+                      <button className="btn ghost small icon-only" aria-label="Dokument bearbeiten" title="Dokument bearbeiten" onClick={() => editDoc(d)}>
+                        <i className="fa-solid fa-pen-to-square" aria-hidden />
+                        <span className="sr-only">Bearbeiten</span>
+                      </button>
+                      <button className="btn ghost small icon-only" aria-label={d.originalName ? "Datei ersetzen" : "Datei hochladen"} title={d.originalName ? "Datei ersetzen" : "Datei hochladen"} onClick={() => pickFile(d.id)}>
+                        <i className={`fa-solid ${d.originalName ? "fa-arrows-rotate" : "fa-upload"}`} aria-hidden />
+                        <span className="sr-only">{d.originalName ? "Ersetzen" : "Hochladen"}</span>
+                      </button>
+                      <button className="btn danger small icon-only" aria-label="Dokument löschen" title="Dokument löschen" onClick={() => remove(d.id)}>
+                        <i className="fa-solid fa-trash" aria-hidden />
+                        <span className="sr-only">Löschen</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>}
 
       </div>
     </>

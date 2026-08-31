@@ -841,15 +841,24 @@ textarea { min-height: 70px; resize: vertical; }
   min-width: 96px;
 }
 
-.contracts-compact-mobile {
+/* =====================================================================
+   Responsive table pattern (desktop table <-> mobile card list).
+   Used by every data table in the app: wrap the <table> in a container
+   with "rtable-desktop", and provide a sibling "rtable-cards" container
+   with one "mobile-card" per row. Only one of the two is visible at a
+   given breakpoint (see the max-width: 860px query below).
+   ===================================================================== */
+.rtable-cards {
   display: none;
 }
 
-.contracts-mobile {
-  display: none;
+/* Same card look as .rtable-cards, but shown at every screen size - for
+   data that reads better as a list than a table even on desktop. */
+.card-list {
+  display: block;
 }
 
-.contracts-mobile-card {
+.mobile-card {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 10px;
@@ -857,11 +866,11 @@ textarea { min-height: 70px; resize: vertical; }
   background: color-mix(in srgb, var(--card) 90%, var(--bg));
 }
 
-.contracts-mobile-card:last-child {
+.mobile-card:last-child {
   margin-bottom: 0;
 }
 
-.contracts-mobile-head {
+.mobile-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -869,7 +878,7 @@ textarea { min-height: 70px; resize: vertical; }
   margin-bottom: 4px;
 }
 
-.contracts-mobile-grid {
+.mobile-card-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 3px;
@@ -878,7 +887,12 @@ textarea { min-height: 70px; resize: vertical; }
   color: var(--text-soft);
 }
 
-.contracts-mobile-actions {
+.mobile-card-grid span strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.mobile-card-actions {
   margin-top: 8px;
 }
 
@@ -1515,11 +1529,11 @@ textarea { min-height: 70px; resize: vertical; }
     overflow-x: hidden;
   }
 
-  .contracts-desktop {
+  .rtable-desktop {
     display: none;
   }
 
-  .contracts-mobile {
+  .rtable-cards {
     display: block;
   }
 
@@ -1556,10 +1570,6 @@ textarea { min-height: 70px; resize: vertical; }
   .contracts-table .action-cell .btn.icon-only.small {
     width: 28px;
     height: 28px;
-  }
-
-  .contracts-compact-mobile {
-    display: block;
   }
 
   .family-calendar-cell {

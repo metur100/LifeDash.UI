@@ -139,42 +139,72 @@ export default function WishList() {
           {open.length === 0 ? (
             <Empty title="Noch nichts geplant." hint="Lege einen Wunsch oder eine große Anschaffung an." />
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Eintrag</th>
-                  <th className="num">Preis</th>
-                  <th className="num action-col">Aktion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {open.map((w) => (
-                  <tr key={w.id}>
-                    <td>
-                      <strong>{w.title}</strong>
-                      <div className="alert-msg">{w.room || "-"}</div>
-                    </td>
-                    <td className="num">{w.cost ? euro(w.cost, w.currency) : "-"}</td>
-                    <td className="num action-cell">
-                      <div className="action-stack">
-                        <button className="btn ghost small icon-only" aria-label="Als gekauft markieren" title="Als gekauft markieren" onClick={() => markBought(w)}>
-                          <i className="fa-solid fa-circle-check" aria-hidden />
-                          <span className="sr-only">Gekauft</span>
-                        </button>
-                        <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editWish(w)}>
-                          <i className="fa-solid fa-pen-to-square" aria-hidden />
-                          <span className="sr-only">Bearbeiten</span>
-                        </button>
-                        <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeWish(w.id)}>
-                          <i className="fa-solid fa-trash" aria-hidden />
-                          <span className="sr-only">Löschen</span>
-                        </button>
-                      </div>
-                    </td>
+            <>
+            <div className="table-scroll rtable-desktop">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Eintrag</th>
+                    <th className="num">Preis</th>
+                    <th className="num action-col">Aktion</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {open.map((w) => (
+                    <tr key={w.id}>
+                      <td>
+                        <strong>{w.title}</strong>
+                        <div className="alert-msg">{w.room || "-"}</div>
+                      </td>
+                      <td className="num">{w.cost ? euro(w.cost, w.currency) : "-"}</td>
+                      <td className="num action-cell">
+                        <div className="action-stack">
+                          <button className="btn ghost small icon-only" aria-label="Als gekauft markieren" title="Als gekauft markieren" onClick={() => markBought(w)}>
+                            <i className="fa-solid fa-circle-check" aria-hidden />
+                            <span className="sr-only">Gekauft</span>
+                          </button>
+                          <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editWish(w)}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>
+                          <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeWish(w.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="rtable-cards">
+              {open.map((w) => (
+                <div key={`m-${w.id}`} className="mobile-card">
+                  <div className="mobile-card-head">
+                    <strong>{w.title}</strong>
+                    <span className="badge">{w.cost ? euro(w.cost, w.currency) : "-"}</span>
+                  </div>
+                  <div className="alert-msg">{w.room || "-"}</div>
+                  <div className="action-stack mobile-card-actions">
+                    <button className="btn ghost small icon-only" aria-label="Als gekauft markieren" title="Als gekauft markieren" onClick={() => markBought(w)}>
+                      <i className="fa-solid fa-circle-check" aria-hidden />
+                      <span className="sr-only">Gekauft</span>
+                    </button>
+                    <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editWish(w)}>
+                      <i className="fa-solid fa-pen-to-square" aria-hidden />
+                      <span className="sr-only">Bearbeiten</span>
+                    </button>
+                    <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeWish(w.id)}>
+                      <i className="fa-solid fa-trash" aria-hidden />
+                      <span className="sr-only">Löschen</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </Section>
@@ -184,38 +214,64 @@ export default function WishList() {
           {done.length === 0 ? (
             <Empty title="Noch nichts gekauft." hint="Als gekauft markierte Einträge erscheinen hier." />
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Eintrag</th>
-                  <th className="num">Preis</th>
-                  <th className="num action-col">Aktion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {done.map((w) => (
-                  <tr key={w.id}>
-                    <td>
-                      <strong>{w.title}</strong>
-                      <div className="alert-msg">{w.purchasedOn ? `gekauft am ${shortDate(w.purchasedOn)}` : "gekauft"}</div>
-                    </td>
-                    <td className="num">{w.cost ? euro(w.cost, w.currency) : "-"}</td>
-                    <td className="num action-cell">
-                      <div className="action-stack">
-                        <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editWish(w)}>
-                          <i className="fa-solid fa-pen-to-square" aria-hidden />
-                          <span className="sr-only">Bearbeiten</span>
-                        </button>
-                        <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeWish(w.id)}>
-                          <i className="fa-solid fa-trash" aria-hidden />
-                          <span className="sr-only">Löschen</span>
-                        </button>
-                      </div>
-                    </td>
+            <>
+            <div className="table-scroll rtable-desktop">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Eintrag</th>
+                    <th className="num">Preis</th>
+                    <th className="num action-col">Aktion</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {done.map((w) => (
+                    <tr key={w.id}>
+                      <td>
+                        <strong>{w.title}</strong>
+                        <div className="alert-msg">{w.purchasedOn ? `gekauft am ${shortDate(w.purchasedOn)}` : "gekauft"}</div>
+                      </td>
+                      <td className="num">{w.cost ? euro(w.cost, w.currency) : "-"}</td>
+                      <td className="num action-cell">
+                        <div className="action-stack">
+                          <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editWish(w)}>
+                            <i className="fa-solid fa-pen-to-square" aria-hidden />
+                            <span className="sr-only">Bearbeiten</span>
+                          </button>
+                          <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeWish(w.id)}>
+                            <i className="fa-solid fa-trash" aria-hidden />
+                            <span className="sr-only">Löschen</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="rtable-cards">
+              {done.map((w) => (
+                <div key={`m-${w.id}`} className="mobile-card">
+                  <div className="mobile-card-head">
+                    <strong>{w.title}</strong>
+                    <span className="badge">{w.cost ? euro(w.cost, w.currency) : "-"}</span>
+                  </div>
+                  <div className="alert-msg">{w.purchasedOn ? `gekauft am ${shortDate(w.purchasedOn)}` : "gekauft"}</div>
+                  <div className="action-stack mobile-card-actions">
+                    <button className="btn ghost small icon-only" aria-label="Eintrag bearbeiten" title="Eintrag bearbeiten" onClick={() => editWish(w)}>
+                      <i className="fa-solid fa-pen-to-square" aria-hidden />
+                      <span className="sr-only">Bearbeiten</span>
+                    </button>
+                    <button className="btn danger small icon-only" aria-label="Eintrag löschen" title="Eintrag löschen" onClick={() => removeWish(w.id)}>
+                      <i className="fa-solid fa-trash" aria-hidden />
+                      <span className="sr-only">Löschen</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </Section>

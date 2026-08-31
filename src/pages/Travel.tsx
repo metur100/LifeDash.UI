@@ -360,35 +360,64 @@ export default function Travel() {
             </div>
             {trip.bookings.length === 0
               ? <Empty title="Noch nichts gebucht." hint="Flüge, Hotels und Mietwagen landen hier." />
-              : <table>
-                  <thead><tr><th>Buchung</th><th className="num">Betrag</th><th className="num action-col">Aktion</th></tr></thead>
-                  <tbody>
-                    {trip.bookings.map((b) => (
-                      <tr key={b.id}>
-                        <td>
-                          <strong>{b.title}</strong>
-                          <div className="alert-msg">
-                            <span className="badge">{b.kind}</span>{" "}
-                            {b.referenceNo ? `Nr. ${b.referenceNo} · ` : ""}{dateTime(b.startsAt)}
-                          </div>
-                        </td>
-                        <td className="num">{b.amount ? euro(b.amount, b.currency) : "—"}</td>
-                        <td className="num action-cell">
-                          <div className="action-stack">
-                          <button className="btn ghost small icon-only" aria-label="Buchung bearbeiten" title="Buchung bearbeiten" onClick={() => editBooking(trip, b.id)}>
-                            <i className="fa-solid fa-pen-to-square" aria-hidden />
-                            <span className="sr-only">Bearbeiten</span>
-                          </button>{" "}
-                          <button className="btn danger small icon-only" aria-label="Buchung löschen" title="Buchung löschen" onClick={() => removeBooking(trip, b.id)}>
-                            <i className="fa-solid fa-trash" aria-hidden />
-                            <span className="sr-only">Löschen</span>
-                          </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>}
+              : <>
+                <div className="table-scroll rtable-desktop">
+                  <table>
+                    <thead><tr><th>Buchung</th><th className="num">Betrag</th><th className="num action-col">Aktion</th></tr></thead>
+                    <tbody>
+                      {trip.bookings.map((b) => (
+                        <tr key={b.id}>
+                          <td>
+                            <strong>{b.title}</strong>
+                            <div className="alert-msg">
+                              <span className="badge">{b.kind}</span>{" "}
+                              {b.referenceNo ? `Nr. ${b.referenceNo} · ` : ""}{dateTime(b.startsAt)}
+                            </div>
+                          </td>
+                          <td className="num">{b.amount ? euro(b.amount, b.currency) : "—"}</td>
+                          <td className="num action-cell">
+                            <div className="action-stack">
+                            <button className="btn ghost small icon-only" aria-label="Buchung bearbeiten" title="Buchung bearbeiten" onClick={() => editBooking(trip, b.id)}>
+                              <i className="fa-solid fa-pen-to-square" aria-hidden />
+                              <span className="sr-only">Bearbeiten</span>
+                            </button>{" "}
+                            <button className="btn danger small icon-only" aria-label="Buchung löschen" title="Buchung löschen" onClick={() => removeBooking(trip, b.id)}>
+                              <i className="fa-solid fa-trash" aria-hidden />
+                              <span className="sr-only">Löschen</span>
+                            </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="rtable-cards">
+                  {trip.bookings.map((b) => (
+                    <div key={`m-${b.id}`} className="mobile-card">
+                      <div className="mobile-card-head">
+                        <strong>{b.title}</strong>
+                        <span className="badge">{b.amount ? euro(b.amount, b.currency) : "—"}</span>
+                      </div>
+                      <div className="alert-msg">
+                        <span className="badge">{b.kind}</span>{" "}
+                        {b.referenceNo ? `Nr. ${b.referenceNo} · ` : ""}{dateTime(b.startsAt)}
+                      </div>
+                      <div className="action-stack mobile-card-actions">
+                        <button className="btn ghost small icon-only" aria-label="Buchung bearbeiten" title="Buchung bearbeiten" onClick={() => editBooking(trip, b.id)}>
+                          <i className="fa-solid fa-pen-to-square" aria-hidden />
+                          <span className="sr-only">Bearbeiten</span>
+                        </button>
+                        <button className="btn danger small icon-only" aria-label="Buchung löschen" title="Buchung löschen" onClick={() => removeBooking(trip, b.id)}>
+                          <i className="fa-solid fa-trash" aria-hidden />
+                          <span className="sr-only">Löschen</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>}
           </div>
         </Section>
 
@@ -429,33 +458,31 @@ export default function Travel() {
       {list.length > 1 && (
         <Section title="Weitere Reisen">
           <div className="card">
-            <table>
-              <tbody>
-                {list.filter((t) => t.id !== trip.id).map((t) => (
-                  <tr key={t.id}>
-                    <td><strong>{t.title}</strong><div className="alert-msg">{t.destination}</div></td>
-                    <td>{shortDate(t.startsOn)}</td>
-                    <td className="num"><span className="badge">{t.status}</span></td>
-                    <td className="num action-cell">
-                      <div className="action-stack">
-                      <button className="btn ghost small icon-only" aria-label="Reise öffnen" title="Reise öffnen" onClick={() => setSelectedTripId(t.id)}>
-                        <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden />
-                        <span className="sr-only">Öffnen</span>
-                      </button>{" "}
-                      <button className="btn ghost small icon-only" aria-label="Reise bearbeiten" title="Reise bearbeiten" onClick={() => editTrip(t)}>
-                        <i className="fa-solid fa-pen-to-square" aria-hidden />
-                        <span className="sr-only">Bearbeiten</span>
-                      </button>{" "}
-                      <button className="btn danger small icon-only" aria-label="Reise löschen" title="Reise löschen" onClick={() => removeTrip(t.id)}>
-                        <i className="fa-solid fa-trash" aria-hidden />
-                        <span className="sr-only">Löschen</span>
-                      </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="card-list">
+              {list.filter((t) => t.id !== trip.id).map((t) => (
+                <div key={t.id} className="mobile-card">
+                  <div className="mobile-card-head">
+                    <strong>{t.title}</strong>
+                    <span className="badge">{t.status}</span>
+                  </div>
+                  <div className="alert-msg">{t.destination}{t.destination ? " · " : ""}{shortDate(t.startsOn)}</div>
+                  <div className="action-stack mobile-card-actions">
+                    <button className="btn ghost small icon-only" aria-label="Reise öffnen" title="Reise öffnen" onClick={() => setSelectedTripId(t.id)}>
+                      <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden />
+                      <span className="sr-only">Öffnen</span>
+                    </button>
+                    <button className="btn ghost small icon-only" aria-label="Reise bearbeiten" title="Reise bearbeiten" onClick={() => editTrip(t)}>
+                      <i className="fa-solid fa-pen-to-square" aria-hidden />
+                      <span className="sr-only">Bearbeiten</span>
+                    </button>
+                    <button className="btn danger small icon-only" aria-label="Reise löschen" title="Reise löschen" onClick={() => removeTrip(t.id)}>
+                      <i className="fa-solid fa-trash" aria-hidden />
+                      <span className="sr-only">Löschen</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </Section>
       )}
