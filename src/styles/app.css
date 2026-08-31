@@ -973,6 +973,7 @@ textarea { min-height: 70px; resize: vertical; }
   align-items: center;
   gap: 4px;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .appt-title {
@@ -1013,6 +1014,30 @@ textarea { min-height: 70px; resize: vertical; }
   color: #6b251a;
   border-color: #f3c4b3;
   background: #fff2ed;
+}
+
+.badge.important-date-cat-birthday {
+  color: #4f2b0c;
+  border-color: #f0cc9a;
+  background: #fff4e4;
+}
+
+.badge.important-date-cat-wedding {
+  color: #5a1f3e;
+  border-color: #e8bfd7;
+  background: #fff1f8;
+}
+
+.badge.important-date-cat-anniversary {
+  color: #15435a;
+  border-color: #b8d8ea;
+  background: #eaf5fb;
+}
+
+.badge.important-date-cat-other {
+  color: #374756;
+  border-color: #ced7df;
+  background: #f1f5f8;
 }
 
 .family-calendar-cell .appt.appt-cat-family,

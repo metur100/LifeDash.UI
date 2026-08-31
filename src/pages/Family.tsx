@@ -269,6 +269,20 @@ const APPOINTMENT_CATEGORIES = [
   { value: "other", label: "Sonstiges" },
 ];
 
+const IMPORTANT_DATE_CATEGORIES = [
+  { value: "birthday", label: "Geburtstag" },
+  { value: "wedding", label: "Hochzeitstag" },
+  { value: "anniversary", label: "Jahrestag" },
+  { value: "other", label: "Sonstiges" },
+];
+
+const importantDateCategoryLabelByValue = new Map(IMPORTANT_DATE_CATEGORIES.map((x) => [x.value, x.label]));
+
+function importantDateCategoryLabel(category?: string | null): string {
+  const key = String(category ?? "").trim().toLowerCase();
+  return importantDateCategoryLabelByValue.get(key) ?? "Sonstiges";
+}
+
 const PERSON_ROLE_OPTIONS = [
   { value: "", label: "-" },
   { value: "Ich", label: "Ich" },
@@ -674,6 +688,7 @@ export default function Family() {
       title: "Wichtiges Datum bearbeiten",
       fields: [
         { key: "title", label: "Anlass" },
+        { key: "category", label: "Kategorie", type: "select", options: IMPORTANT_DATE_CATEGORIES },
         { key: "dateValue", label: "Datum", type: "date" },
         {
           key: "cadence",
@@ -689,6 +704,7 @@ export default function Family() {
       ],
       initial: {
         title: d.title,
+        category: d.category || "other",
         dateValue: d.dateValue,
         cadence: importantCadence(d),
       },
@@ -700,6 +716,7 @@ export default function Family() {
       await api.put(`/api/important-dates/${d.id}`, {
         ...d,
         title: String(values.title).trim(),
+        category: String(values.category || "other"),
         dateValue: String(values.dateValue),
         repeatsYearly: true,
         notes: withImportantCadence(d.notes, cadence),
@@ -807,6 +824,7 @@ export default function Family() {
       submitText: "Anlegen",
       fields: [
         { key: "title", label: "Anlass" },
+        { key: "category", label: "Kategorie", type: "select", options: IMPORTANT_DATE_CATEGORIES },
         { key: "dateValue", label: "Datum", type: "date" },
         { key: "cadence", label: "Wiederholung", type: "select", options: [
           { value: "monthly", label: "monatlich" },
@@ -817,6 +835,7 @@ export default function Family() {
       ],
       initial: {
         title: "",
+        category: "other",
         dateValue: today(),
         cadence: "yearly",
       },
@@ -828,6 +847,7 @@ export default function Family() {
       const cadence = String(values.cadence) as ImportantCadence;
       await api.post("/api/important-dates", {
         title: String(values.title).trim(),
+        category: String(values.category || "other"),
         dateValue: String(values.dateValue),
         repeatsYearly: true,
         notes: withImportantCadence(null, cadence),
@@ -1044,6 +1064,16 @@ export default function Family() {
                         key={`imp-${d.id}`}
                         className="appt important-date"
                         title={importantDateTooltip(d, cell.iso)}
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); void editDate(d); }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void editDate(d);
+                          }
+                        }}
                       >
                         {d.title}
                       </span>
@@ -1053,6 +1083,16 @@ export default function Family() {
                         key={a.id}
                         className={`appt appt-cat-${normalizeCategory(a.category)}`}
                         title={appointmentTooltip(a, memberNameById)}
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); void editAppointment(a); }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void editAppointment(a);
+                          }
+                        }}
                       >
                         <span className="appt-title">{a.title}</span>
                         <button
@@ -1152,11 +1192,12 @@ export default function Family() {
           ? <Empty title="Noch keine wichtigen Anlässe." hint="Geburtstage, Jahrestage und weitere wiederkehrende Anlässe erscheinen hier." />
           : <div className="card">
               <table>
-                <thead><tr><th>Anlass</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
+                <thead><tr><th>Anlass</th><th>Kategorie</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
                 <tbody>
                   {(dates.data ?? []).map((d) => (
                     <tr key={d.id}>
                       <td><strong>{d.title}</strong></td>
+                      <td><span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category)}</span></td>
                       <td>{shortDate(d.dateValue)}</td>
                       <td>{importantCadence(d) === "monthly" ? "monatlich" : importantCadence(d) === "quarterly" ? "quartalsweise" : importantCadence(d) === "semiannual" ? "alle 6 Monate" : "jährlich"}</td>
                       <td className="num">{countdown(daysUntil(nextImportantOccurrence(d)))}</td>

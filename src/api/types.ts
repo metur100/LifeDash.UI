@@ -65,7 +65,7 @@ export interface Appointment {
 
 export interface ImportantDate {
   id: number; userId: number; familyMemberId?: number | null;
-  title: string; dateValue: string; repeatsYearly: boolean;
+  title: string; category: string; dateValue: string; repeatsYearly: boolean;
   reminderDays: number; notes?: string | null;
 }
 
