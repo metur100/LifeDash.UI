@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import type { DashboardResponse } from "../api/types";
+import ConnectServicesDialog from "./ConnectServicesDialog";
 import { useAuth } from "./AuthContext";
 import { useTheme } from "./ThemeContext";
 
@@ -132,6 +133,7 @@ export default function Layout({ alertCount }: { alertCount: number }) {
       </aside>
 
       <main className="main"><Outlet /></main>
+      <ConnectServicesDialog />
     </div>
   );
 }
