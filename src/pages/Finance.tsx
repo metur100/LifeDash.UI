@@ -265,10 +265,6 @@ function nextIncomeDate(i: Income, fromIso = today()): string | null {
   return anchor;
 }
 
-function monthId(iso: string): string {
-  return iso.slice(0, 7);
-}
-
 const UPCOMING_HORIZON_DAYS = 400;
 
 function currentYear(iso = today()): number {
@@ -315,19 +311,14 @@ export default function Finance() {
     const monthCosts = activeCosts.reduce((s, c) => s + monthly(c.amount, c.cadence), 0);
     const yearCosts = activeCosts.reduce((s, c) => s + yearly(c.amount, c.cadence), 0);
 
-    const currentMonthId = monthId(today());
     const year = currentYear();
 
     const openPayments = (payments.data ?? []).filter((p) => !p.isPaid);
-    const dueThisMonth = openPayments
-      .filter((p) => monthId(p.dueOn) === currentMonthId)
-      .reduce((s, p) => s + p.amount, 0);
-
     const oneTimeThisYear = openPayments
       .filter((p) => Number(p.dueOn.slice(0, 4)) === year)
       .reduce((s, p) => s + p.amount, 0);
 
-    const leftMonth = monthIncome - monthCosts - dueThisMonth;
+    const leftMonth = monthIncome - monthCosts;
     const leftYear = yearIncome - yearCosts - oneTimeThisYear;
 
     return {
