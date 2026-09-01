@@ -9,6 +9,7 @@ import Documents from "./pages/Documents";
 import Family from "./pages/Family";
 import Finance from "./pages/Finance";
 import Login from "./pages/Login";
+import Mail from "./pages/Mail";
 import Tasks from "./pages/Tasks";
 import Travel from "./pages/Travel";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="travel/:id" element={<Travel />} />
           <Route path="documents" element={<Documents />} />
           <Route path="documents/:id" element={<Documents />} />
+          <Route path="mail" element={<Mail />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

@@ -19,9 +19,15 @@ system lives in `src/styles/app.css`.
 | Variable | Purpose | Example |
 |---|---|---|
 | `VITE_API_URL` | Backend base URL, no trailing slash | `https://api.example.com` |
+| `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID for login, Drive, and Gmail | `your-client-id.apps.googleusercontent.com` |
+| `VITE_GOOGLE_MAPS_API_KEY` | Browser-restricted key for travel maps and Places | `AIza...` |
 | `VITE_BASE` | Build-time sub-path, GitHub Pages project sites only | `/lifedash/` |
 
 Vite inlines these at build time - rebuild after changing them.
+
+For `VITE_GOOGLE_MAPS_API_KEY`, create a browser key restricted to the production
+site origin and local development origin, then restrict its API access to Maps
+JavaScript API and Places API. Do not use a server key in the frontend.
 
 ## Deploy to Cloudflare Pages
 

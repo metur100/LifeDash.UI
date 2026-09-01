@@ -134,7 +134,7 @@ export interface PackingItem {
 }
 
 export interface Trip {
-  id: number; userId: number; title: string; destination?: string | null;
+  id: number; userId: number; title: string; startPlace?: string | null; destination?: string | null;
   startsOn: string; endsOn?: string | null; status: string;
   budget?: number | null; notes?: string | null;
   bookings: Booking[]; packingItems: PackingItem[];

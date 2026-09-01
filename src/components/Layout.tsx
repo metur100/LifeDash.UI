@@ -14,6 +14,7 @@ const links = [
   { to: "/wishlist", label: "Wunschliste", icon: "fa-solid fa-gift" },
   { to: "/travel", label: "Reisen", icon: "fa-solid fa-plane-departure" },
   { to: "/documents", label: "Dokumente", icon: "fa-solid fa-folder-open" },
+  { to: "/mail", label: "E-Mail", icon: "fa-solid fa-envelope" },
   { to: "/tasks", label: "Aufgaben", icon: "fa-solid fa-list-check" },
 ];
 

@@ -25,10 +25,10 @@ export function ErrorBar({ message }: { message: string | null }) {
   return message ? <div className="error-bar" role="alert">{message}</div> : null;
 }
 
-export function Section({ title, action, children }:
-  { title: string; action?: ReactNode; children: ReactNode }) {
+export function Section({ title, action, children, className }:
+  { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className="section">
+    <section className={`section ${className ?? ""}`.trim()}>
       <div className="section-head"><h2>{title}</h2>{action}</div>
       {children}
     </section>
