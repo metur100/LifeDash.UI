@@ -169,7 +169,7 @@ export default function Mail() {
           resolve(response.access_token);
         },
       });
-      tokenClient.requestAccessToken({ prompt: token.current ? "" : "consent" });
+      tokenClient.requestAccessToken({ prompt: "" });
     });
   }
 
