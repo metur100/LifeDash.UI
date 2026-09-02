@@ -536,7 +536,27 @@ function MailMessageContent({ message, onAttachment, busy, actions }: { message:
       <div><span>An</span><strong>{headerValue(message, "To")}</strong></div>
       <div><span>Datum</span><strong>{formatMailDate(headerValue(message, "Date"))}</strong></div>
     </div>
-    {sanitizedHtml ? <div className="mail-html" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sanitizedHtml, { USE_PROFILES: { html: true } }) }} /> : <p className="mail-snippet">{message.snippet || "Kein Nachrichtentext verfügbar."}</p>}
+    {sanitizedHtml ? <HtmlEmail content={sanitizedHtml} /> : <p className="mail-snippet">{message.snippet || "Kein Nachrichtentext verfügbar."}</p>}
     {attachments.length > 0 && <div className="mail-attachments"><strong>Anhänge</strong><div>{attachments.map((attachment, index) => <button key={`${attachment.filename}-${index}`} className="btn ghost small" onClick={() => void onAttachment(attachment)} disabled={busy}><i className="fa-solid fa-paperclip" aria-hidden /> {attachment.filename}</button>)}</div></div>}
   </article>;
+}
+
+function HtmlEmail({ content }: { content: string }) {
+  const iframe = useRef<HTMLIFrameElement>(null);
+  const html = DOMPurify.sanitize(content, { USE_PROFILES: { html: true } });
+
+  function sizeToContent() {
+    const document = iframe.current?.contentDocument;
+    if (!iframe.current || !document) return;
+    iframe.current.style.height = `${Math.max(240, document.documentElement.scrollHeight, document.body.scrollHeight)}px`;
+  }
+
+  return <iframe
+    ref={iframe}
+    className="mail-html"
+    sandbox="allow-same-origin allow-popups"
+    title="E-Mail-Inhalt"
+    srcDoc={`<!doctype html><html><head><base target="_blank"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0;padding:0;background:#fff;color:#202124}body{overflow-wrap:break-word}img{max-width:100%;height:auto}</style></head><body>${html}</body></html>`}
+    onLoad={sizeToContent}
+  />;
 }
