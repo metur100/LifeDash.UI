@@ -86,7 +86,7 @@ export default function ConnectServicesDialog() {
             resolve();
           },
         });
-        client.requestAccessToken({ prompt: "consent" });
+        client.requestAccessToken({ prompt: "" });
       });
       dismiss();
     } catch (e) {
@@ -104,16 +104,11 @@ export default function ConnectServicesDialog() {
         <div className="dlg-head">
           <h3>Google Drive &amp; Gmail verbinden</h3>
         </div>
-        <p className="dlg-text">
-          Ein Klick auf "Jetzt verbinden" fragt Google Drive und Gmail zusammen in einem einzigen
-          Google-Freigabefenster ab. Dort einfach "Alle auswählen" bestätigen — danach sind beide Dienste
-          sofort auf allen Seiten verfügbar, ohne dass du es dort erneut einrichten musst.
-        </p>
+        <p className="dlg-text">Ein Klick verbindet Google Drive und Gmail mit diesem Konto.</p>
         <ErrorBar message={error} />
         <div className="dlg-actions">
-          <button className="btn ghost" onClick={dismiss} disabled={busy}>Später</button>
           <button className="btn" onClick={connect} disabled={busy}>
-            {busy ? "Verbinde …" : "Jetzt verbinden"}
+            {busy ? "Verbinde …" : "Mit Google-Konto verbinden"}
           </button>
         </div>
       </div>
