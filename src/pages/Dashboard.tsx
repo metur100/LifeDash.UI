@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { DashboardResponse } from "../api/types";
 import AlertRow from "../components/AlertRow";
+import DashboardWeather from "../components/DashboardWeather";
 import Horizon from "../components/Horizon";
 import { Empty, ErrorBar, PageHead, Stat } from "../components/Ui";
 import { euro } from "../lib/format";
@@ -49,6 +50,8 @@ export default function Dashboard({ onCount }: { onCount?: (n: number) => void }
         title="Was als Nächstes ansteht"
         lede="Alle Fristen aus Familie, Behörden, Finanzen und Reisen an einem Ort — nach Dringlichkeit sortiert."
       />
+
+      <DashboardWeather />
 
       <Horizon alerts={data.alerts} horizon={120} />
 
