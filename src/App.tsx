@@ -5,6 +5,7 @@ import Layout from "./components/Layout";
 import Authorities from "./pages/Authorities";
 import Contracts from "./pages/Contracts";
 import Dashboard from "./pages/Dashboard";
+import Deliveries from "./pages/Deliveries";
 import Documents from "./pages/Documents";
 import Family from "./pages/Family";
 import Finance from "./pages/Finance";
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="authorities/:id" element={<Authorities />} />
           <Route path="finance" element={<Finance />} />
           <Route path="contracts" element={<Contracts />} />
+          <Route path="deliveries" element={<Deliveries />} />
           <Route path="wishlist" element={<WishList />} />
           <Route path="travel" element={<Travel />} />
           <Route path="travel/:id" element={<Travel />} />

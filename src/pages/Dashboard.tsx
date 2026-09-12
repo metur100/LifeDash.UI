@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { DashboardResponse } from "../api/types";
 import AlertRow from "../components/AlertRow";
+import DashboardDeliveries from "../components/DashboardDeliveries";
 import DashboardWeather from "../components/DashboardWeather";
 import Horizon from "../components/Horizon";
 import { Empty, ErrorBar, PageHead, Stat } from "../components/Ui";
@@ -52,6 +53,8 @@ export default function Dashboard({ onCount }: { onCount?: (n: number) => void }
       />
 
       <Horizon alerts={data.alerts} horizon={120} />
+
+      <DashboardDeliveries />
 
       <DashboardWeather />
 

@@ -2514,3 +2514,410 @@ textarea { min-height: 70px; resize: vertical; }
     display: none;
   }
 }
+
+/* =====================================================================
+   Deliveries & Package Tracking Styles
+   ===================================================================== */
+.quick-tracking-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+
+.quick-tracking-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.quick-tracking-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(181, 79, 47, 0.12);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.quick-tracking-head strong {
+  display: block;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.quick-tracking-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.quick-tracking-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.quick-form-inputs {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.quick-input-code {
+  flex: 1.2;
+  min-width: 160px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.quick-input-title {
+  flex: 1;
+  min-width: 140px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+}
+
+.quick-detected-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: 8px;
+  background: rgba(181, 79, 47, 0.08);
+  padding: 4px 10px;
+  border-radius: 6px;
+  width: fit-content;
+}
+
+.delivery-filters-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.delivery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.delivery-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.delivery-card.is-delivered {
+  opacity: 0.75;
+  background: var(--bg);
+}
+
+.delivery-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.delivery-carrier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--bg);
+}
+
+.delivery-title {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.delivery-sender {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.delivery-tracking-code {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.delivery-tracking-code .code-label {
+  color: var(--text-soft);
+}
+
+.delivery-tracking-code code {
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.delivery-history {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+}
+
+.delivery-history-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+}
+
+.delivery-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.delivery-history-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+}
+
+.delivery-history-item i {
+  font-size: 10px;
+  color: var(--accent);
+  margin-top: 3px;
+}
+
+.delivery-history-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.delivery-history-text {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.delivery-history-time {
+  font-size: 10px;
+  color: var(--text-soft);
+  font-family: var(--mono);
+}
+
+.delivery-updated-hint {
+  margin: -8px 0 12px;
+  font-size: 10px;
+  color: var(--text-soft);
+}
+
+.delivery-delivery-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-soft);
+  margin-bottom: 14px;
+}
+
+.delivery-delivery-date strong {
+  color: var(--text);
+}
+
+.tag-today {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.tag-tomorrow {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.delivery-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* Dashboard Deliveries Widget */
+.dashboard-deliveries-widget {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  margin-bottom: 22px;
+}
+
+.dashboard-deliveries-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.deliveries-head-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+
+.deliveries-head-title h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.dashboard-deliveries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-delivery-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.dashboard-delivery-row.highlight {
+  border-color: var(--accent);
+  background: rgba(181, 79, 47, 0.05);
+}
+
+.delivery-row-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.carrier-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #fff;
+  background: var(--text-soft);
+  flex-shrink: 0;
+}
+
+.carrier-tag.dhl {
+  background: #d40511;
+}
+
+.carrier-tag.dpd {
+  background: #dc0032;
+}
+
+.carrier-tag.hermes {
+  background: #0091ff;
+}
+
+.carrier-tag.gls {
+  background: #002a79;
+}
+
+.delivery-row-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.delivery-row-info strong {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.delivery-row-sub {
+  font-size: 11px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.delivery-row-right {
+  flex-shrink: 0;
+}
+
+.delivery-date-tag {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.delivery-date-tag strong {
+  color: var(--accent);
+}

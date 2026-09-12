@@ -11,6 +11,7 @@ const links = [
   { to: "/authorities", label: "Behörden", icon: "fa-solid fa-building-shield" },
   { to: "/finance", label: "Finanzen", icon: "fa-solid fa-wallet" },
   { to: "/contracts", label: "Verträge", icon: "fa-solid fa-file-signature" },
+  { to: "/deliveries", label: "Lieferungen", icon: "fa-solid fa-box-open" },
   { to: "/wishlist", label: "Wunschliste", icon: "fa-solid fa-gift" },
   { to: "/travel", label: "Reisen", icon: "fa-solid fa-plane-departure" },
   { to: "/documents", label: "Dokumente", icon: "fa-solid fa-folder-open" },
