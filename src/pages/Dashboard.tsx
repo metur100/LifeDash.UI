@@ -51,9 +51,9 @@ export default function Dashboard({ onCount }: { onCount?: (n: number) => void }
         lede="Alle Fristen aus Familie, Behörden, Finanzen und Reisen an einem Ort — nach Dringlichkeit sortiert."
       />
 
-      <DashboardWeather />
-
       <Horizon alerts={data.alerts} horizon={120} />
+
+      <DashboardWeather />
 
       <div className="stats">
         <Stat label="Überfällig" value={String(s.overdue)}
