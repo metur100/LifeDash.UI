@@ -6,6 +6,20 @@ import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
 import { countdown, daysUntil, euro, shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
+const HOME_ITEM_KIND_LABEL: Record<string, string> = {
+  repair: "Reparatur",
+  purchase: "Anschaffung",
+  warranty: "Garantie",
+};
+
+const HOME_ITEM_STATUS_LABEL: Record<string, string> = {
+  open: "Offen",
+  scheduled: "Geplant",
+  done: "Erledigt",
+};
+const HOME_ITEM_STATUS_OPTIONS = Object.entries(HOME_ITEM_STATUS_LABEL).map(([value, label]) => ({ value, label }));
+const HOME_ITEM_KIND_OPTIONS = Object.entries(HOME_ITEM_KIND_LABEL).map(([value, label]) => ({ value, label }));
+
 export default function HomeItems() {
   const items = useAsync<HomeItem[]>(() => api.get("/api/home-items"), []);
   const dialog = useDialog();
@@ -20,11 +34,7 @@ export default function HomeItems() {
           key: "kind",
           label: "Art",
           type: "select",
-          options: [
-            { value: "repair", label: "Reparatur" },
-            { value: "purchase", label: "Anschaffung" },
-            { value: "warranty", label: "Garantie" },
-          ],
+          options: HOME_ITEM_KIND_OPTIONS,
         },
         { key: "title", label: "Bezeichnung" },
         { key: "room", label: "Raum" },
@@ -76,22 +86,14 @@ export default function HomeItems() {
           key: "kind",
           label: "Art",
           type: "select",
-          options: [
-            { value: "repair", label: "Reparatur" },
-            { value: "purchase", label: "Anschaffung" },
-            { value: "warranty", label: "Garantie" },
-          ],
+          options: HOME_ITEM_KIND_OPTIONS,
         },
         { key: "room", label: "Raum" },
         {
           key: "status",
           label: "Status",
           type: "select",
-          options: [
-            { value: "open", label: "open" },
-            { value: "scheduled", label: "scheduled" },
-            { value: "done", label: "done" },
-          ],
+          options: HOME_ITEM_STATUS_OPTIONS,
         },
         { key: "cost", label: "Kosten", type: "number" },
         { key: "purchasedOn", label: "Kaufdatum", type: "date" },
@@ -354,8 +356,8 @@ export default function HomeItems() {
                     {doneItems.map((d) => (
                       <tr key={d.id}>
                         <td><strong>{d.title}</strong><div className="alert-msg">{d.room ?? d.vendor ?? ""}</div></td>
-                        <td>{d.kind}</td>
-                        <td><span className="badge green">done</span></td>
+                        <td>{HOME_ITEM_KIND_LABEL[d.kind] ?? d.kind}</td>
+                        <td><span className="badge green">{HOME_ITEM_STATUS_LABEL.done}</span></td>
                         <td className="num action-cell">
                           <div className="action-stack">
                           <button className="btn ghost small icon-only" aria-label="Wieder öffnen" title="Wieder öffnen" onClick={() => reopen(d)}>
@@ -379,9 +381,9 @@ export default function HomeItems() {
                   <div key={`m-${d.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{d.title}</strong>
-                      <span className="badge green">done</span>
+                      <span className="badge green">{HOME_ITEM_STATUS_LABEL.done}</span>
                     </div>
-                    <div className="alert-msg">{d.kind}{d.room || d.vendor ? ` · ${d.room ?? d.vendor}` : ""}</div>
+                    <div className="alert-msg">{HOME_ITEM_KIND_LABEL[d.kind] ?? d.kind}{d.room || d.vendor ? ` · ${d.room ?? d.vendor}` : ""}</div>
                     <div className="action-stack mobile-card-actions">
                       <button className="btn ghost small icon-only" aria-label="Wieder öffnen" title="Wieder öffnen" onClick={() => reopen(d)}>
                         <i className="fa-solid fa-rotate-left" aria-hidden />

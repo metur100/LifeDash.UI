@@ -27,6 +27,13 @@ const cadenceLabel: Record<string, string> = {
   onetime: "einmalig",
 };
 
+const CADENCE_OPTIONS = [
+  { value: "monthly", label: cadenceLabel.monthly },
+  { value: "quarterly", label: cadenceLabel.quarterly },
+  { value: "yearly", label: cadenceLabel.yearly },
+];
+const CADENCE_OPTIONS_WITH_ONETIME = [...CADENCE_OPTIONS, { value: "onetime", label: cadenceLabel.onetime }];
+
 const COST_CATEGORY_OPTIONS = [
   { value: "miete", label: "Miete" },
   { value: "nebenkosten", label: "Nebenkosten" },
@@ -438,12 +445,7 @@ export default function Finance() {
           key: "cadence",
           label: "Turnus",
           type: "select",
-          options: [
-            { value: "onetime", label: "einmalig" },
-            { value: "monthly", label: "monthly" },
-            { value: "quarterly", label: "quarterly" },
-            { value: "yearly", label: "yearly" },
-          ],
+          options: CADENCE_OPTIONS_WITH_ONETIME,
         },
         { key: "category", label: "Kategorie" },
       ],
@@ -503,12 +505,7 @@ export default function Finance() {
           key: "cadence",
           label: "Turnus",
           type: "select",
-          options: [
-            { value: "onetime", label: "einmalig" },
-            { value: "monthly", label: "monthly" },
-            { value: "quarterly", label: "quarterly" },
-            { value: "yearly", label: "yearly" },
-          ],
+          options: CADENCE_OPTIONS_WITH_ONETIME,
         },
         { key: "category", label: "Kategorie" },
       ],
@@ -627,12 +624,7 @@ export default function Finance() {
           key: "cadence",
           label: "Turnus",
           type: "select",
-          options: [
-            { value: "monthly", label: "monthly" },
-            { value: "quarterly", label: "quarterly" },
-            { value: "yearly", label: "yearly" },
-            { value: "onetime", label: "onetime" },
-          ],
+          options: CADENCE_OPTIONS_WITH_ONETIME,
         },
         { key: "anchorDate", label: "Einnahmedatum", type: "date" },
       ],
@@ -696,12 +688,7 @@ export default function Finance() {
           key: "cadence",
           label: "Turnus",
           type: "select",
-          options: [
-            { value: "monthly", label: "monthly" },
-            { value: "quarterly", label: "quarterly" },
-            { value: "yearly", label: "yearly" },
-            { value: "onetime", label: "onetime" },
-          ],
+          options: CADENCE_OPTIONS_WITH_ONETIME,
         },
         { key: "anchorDate", label: "Einnahmedatum", type: "date" },
       ],
@@ -767,12 +754,7 @@ export default function Finance() {
           key: "cadence",
           label: "Turnus",
           type: "select",
-          options: [
-            { value: "monthly", label: "monthly" },
-            { value: "quarterly", label: "quarterly" },
-            { value: "yearly", label: "yearly" },
-            { value: "onetime", label: "onetime" },
-          ],
+          options: CADENCE_OPTIONS_WITH_ONETIME,
         },
         {
           key: "billingDate",
@@ -862,11 +844,7 @@ export default function Finance() {
           key: "cadence",
           label: "Turnus",
           type: "select",
-          options: [
-            { value: "monthly", label: "monthly" },
-            { value: "quarterly", label: "quarterly" },
-            { value: "yearly", label: "yearly" },
-          ],
+          options: CADENCE_OPTIONS,
         },
         {
           key: "billingDate",

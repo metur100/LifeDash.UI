@@ -27,6 +27,22 @@ function fromDateTimeInput(value: unknown): string | null {
   return raw;
 }
 
+const TRIP_STATUS_LABEL: Record<string, string> = {
+  planned: "Geplant",
+  booked: "Gebucht",
+  done: "Abgeschlossen",
+};
+const TRIP_STATUS_OPTIONS = Object.entries(TRIP_STATUS_LABEL).map(([value, label]) => ({ value, label }));
+
+const BOOKING_KIND_LABEL: Record<string, string> = {
+  flight: "Flug",
+  hotel: "Hotel",
+  train: "Zug",
+  car: "Auto",
+  activity: "Aktivität",
+};
+const BOOKING_KIND_OPTIONS = Object.entries(BOOKING_KIND_LABEL).map(([value, label]) => ({ value, label }));
+
 function tripPickerLabel(trip: Trip) {
   return `${trip.title} - ${trip.destination ?? "Ziel offen"} - ${shortDate(trip.startsOn)}`;
 }
@@ -334,11 +350,7 @@ export default function Travel() {
           key: "status",
           label: "Status",
           type: "select",
-          options: [
-            { value: "planned", label: "planned" },
-            { value: "booked", label: "booked" },
-            { value: "done", label: "done" },
-          ],
+          options: TRIP_STATUS_OPTIONS,
         },
       ],
       initial: {
@@ -391,13 +403,7 @@ export default function Travel() {
           key: "kind",
           label: "Art",
           type: "select",
-          options: [
-            { value: "flight", label: "flight" },
-            { value: "hotel", label: "hotel" },
-            { value: "train", label: "train" },
-            { value: "car", label: "car" },
-            { value: "activity", label: "activity" },
-          ],
+          options: BOOKING_KIND_OPTIONS,
         },
         {
           key: "direction",
@@ -454,13 +460,7 @@ export default function Travel() {
           key: "kind",
           label: "Art",
           type: "select",
-          options: [
-            { value: "flight", label: "flight" },
-            { value: "hotel", label: "hotel" },
-            { value: "train", label: "train" },
-            { value: "car", label: "car" },
-            { value: "activity", label: "activity" },
-          ],
+          options: BOOKING_KIND_OPTIONS,
         },
         {
           key: "direction",
@@ -646,7 +646,7 @@ export default function Travel() {
                           <td>
                             <strong>{b.title}</strong>
                             <div className="alert-msg">
-                              <span className="badge">{b.kind}</span>{" "}
+                              <span className="badge">{BOOKING_KIND_LABEL[b.kind] ?? b.kind}</span>{" "}
                               {b.direction && <><span className="badge">{b.direction === "outbound" ? "Hinreise" : "Rückreise"}</span>{" "}</>}
                               {b.referenceNo ? `Nr. ${b.referenceNo} · ` : ""}{dateTime(b.startsAt)}
                             </div>
@@ -678,7 +678,7 @@ export default function Travel() {
                         <span className="badge">{b.amount ? euro(b.amount, b.currency) : "—"}</span>
                       </div>
                       <div className="alert-msg">
-                        <span className="badge">{b.kind}</span>{" "}
+                        <span className="badge">{BOOKING_KIND_LABEL[b.kind] ?? b.kind}</span>{" "}
                         {b.direction && <><span className="badge">{b.direction === "outbound" ? "Hinreise" : "Rückreise"}</span>{" "}</>}
                         {b.referenceNo ? `Nr. ${b.referenceNo} · ` : ""}{dateTime(b.startsAt)}
                       </div>
