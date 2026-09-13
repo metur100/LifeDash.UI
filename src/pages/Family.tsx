@@ -396,6 +396,29 @@ export default function Family() {
   const [monthCursor, setMonthCursor] = useState(() => monthStartDate(new Date()));
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [closeDetailsOnBackdropClick, setCloseDetailsOnBackdropClick] = useState(false);
+  const [mailScanBusy, setMailScanBusy] = useState(false);
+  const [mailScanMessage, setMailScanMessage] = useState<string | null>(null);
+
+  async function scanAppointmentsMailbox() {
+    setError(null);
+    setMailScanMessage(null);
+    setMailScanBusy(true);
+    try {
+      const res = await api.post<{ success: boolean; scanned: number; added: number; skippedDuplicate: number }>(
+        "/api/appointments/scan-mailbox"
+      );
+      await appts.reload();
+      setMailScanMessage(
+        res.added === 0
+          ? "Postfach durchsucht — keine neuen Termine gefunden."
+          : `Postfach durchsucht: ${res.added} neue(r) Termin(e) hinzugefügt.`
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setMailScanBusy(false);
+    }
+  }
 
   async function addMember() {
     const values = await dialog.form({
@@ -1036,7 +1059,14 @@ export default function Family() {
       </Section>
 
       <div className="grid-2">
-        <Section title="Termine" action={<button className="btn icon-only" aria-label="Termin anlegen" title="Termin anlegen" onClick={addAppointment}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Termin anlegen</span></button>}>
+        <Section title="Termine" action={<>
+          <button className="btn ghost icon-only" aria-label="Postfach nach Terminen durchsuchen" title="Postfach nach Terminen durchsuchen" onClick={scanAppointmentsMailbox} disabled={mailScanBusy}>
+            <i className={`fa-solid ${mailScanBusy ? "fa-spinner fa-spin" : "fa-envelope-open-text"}`} aria-hidden />
+            <span className="sr-only">Postfach nach Terminen durchsuchen</span>
+          </button>{" "}
+          <button className="btn icon-only" aria-label="Termin anlegen" title="Termin anlegen" onClick={addAppointment}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Termin anlegen</span></button>
+        </>}>
+          {mailScanMessage && <p className="lede" style={{ marginTop: -4, marginBottom: 10 }}>{mailScanMessage}</p>}
           <div className="card" style={{ marginBottom: 12 }}>
             <div className="row" style={{ marginBottom: 10 }}>
               <button className="btn ghost small icon-only" aria-label={calendarView === "month" ? "Vorheriger Monat" : "Vorherige Woche"} title={calendarView === "month" ? "Vorheriger Monat" : "Vorherige Woche"} onClick={() => setMonthCursor((m) => calendarView === "month" ? addMonth(m, -1) : addDaysDate(m, -7))}>

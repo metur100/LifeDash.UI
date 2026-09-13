@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { PackingItem, Trip } from "../api/types";
+import type { Booking, PackingItem, Trip } from "../api/types";
+import type { DialogField } from "../components/Dialog";
 import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
-import { countdown, dateTime, daysUntil, euro, shortDate } from "../lib/format";
+import { dateTime, daysUntil, euro, shortDate, tripPhase } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
 function toLocalDateTimeInput(iso?: string | null): string {
@@ -28,6 +29,66 @@ function fromDateTimeInput(value: unknown): string | null {
 
 function tripPickerLabel(trip: Trip) {
   return `${trip.title} - ${trip.destination ?? "Ziel offen"} - ${shortDate(trip.startsOn)}`;
+}
+
+// The outbound/return reference dates for a trip's countdown and packing-list grouping: the
+// earliest booking tagged "outbound" (Hinreise) and the latest tagged "return" (Rückreise), falling
+// back to the trip's own startsOn/endsOn when no leg has been tagged yet.
+function tripLegDates(t: Trip): { outboundAt: string; returnAt: string | null } {
+  const byStartsAt = (a: Booking, b: Booking) => new Date(a.startsAt!).getTime() - new Date(b.startsAt!).getTime();
+  const outboundBooking = t.bookings.filter((b) => b.direction === "outbound" && b.startsAt).sort(byStartsAt)[0];
+  const returnBooking = t.bookings.filter((b) => b.direction === "return" && b.startsAt).sort(byStartsAt).at(-1);
+  return {
+    outboundAt: outboundBooking?.startsAt ?? t.startsOn,
+    returnAt: returnBooking?.startsAt ?? t.endsOn ?? null,
+  };
+}
+
+// Bookings tagged with a direction double as the scope options for a packing-list entry, so an
+// item can belong to "Hinreise" or "Rückreise" specifically instead of only the whole trip.
+function directionalBookingOptions(t: Trip) {
+  return t.bookings
+    .filter((b) => b.direction === "outbound" || b.direction === "return")
+    .map((b) => ({ value: String(b.id), label: `${b.direction === "outbound" ? "Hinreise" : "Rückreise"} · ${b.title}` }));
+}
+
+function PackingChecklist({ items, onToggle, onEdit, onRemove }: {
+  items: PackingItem[];
+  onToggle: (p: PackingItem) => void;
+  onEdit: (p: PackingItem) => void;
+  onRemove: (p: PackingItem) => void;
+}) {
+  return (
+    <ul className="checklist">
+      {items.map((p) => (
+        <li key={p.id} className={p.isPacked ? "" : "missing"}>
+          <input type="checkbox" checked={p.isPacked} style={{ width: 16 }}
+                 aria-label={`${p.name} gepackt`}
+                 onChange={() => onToggle(p)} />
+          <span style={{ textDecoration: p.isPacked ? "line-through" : "none" }}>
+            {p.name}{p.quantity > 1 ? ` ×${p.quantity}` : ""}
+          </span>
+          <button className="btn ghost small icon-only" aria-label="Packlisten-Eintrag bearbeiten" title="Packlisten-Eintrag bearbeiten" onClick={() => onEdit(p)}>
+            <i className="fa-solid fa-pen-to-square" aria-hidden />
+            <span className="sr-only">Bearbeiten</span>
+          </button>
+          <button className="btn danger small icon-only" aria-label="Packlisten-Eintrag löschen" title="Packlisten-Eintrag löschen" onClick={() => onRemove(p)}>
+            <i className="fa-solid fa-trash" aria-hidden />
+            <span className="sr-only">Löschen</span>
+          </button>
+          {p.category && <><div className="spacer" /><span className="badge">{p.category}</span></>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function isCurrentOrUpcoming(t: Trip): boolean {
+  const { outboundAt, returnAt } = tripLegDates(t);
+  const outboundDays = daysUntil(outboundAt);
+  const returnDays = returnAt ? daysUntil(returnAt) : null;
+  if (returnDays !== null) return returnDays >= 0;
+  return (outboundDays ?? -1) >= 0;
 }
 
 type NearbyPlace = { name?: string; formatted_address?: string; rating?: number };
@@ -146,7 +207,7 @@ export default function Travel() {
   const trip = id
     ? list.find((t) => t.id === Number(id))
     : (selectedTripId ? list.find((t) => t.id === selectedTripId) : undefined)
-      ?? list.find((t) => daysUntil(t.startsOn)! >= 0)
+      ?? list.find(isCurrentOrUpcoming)
       ?? list[0];
 
   useEffect(() => {
@@ -218,19 +279,31 @@ export default function Travel() {
     } catch (e) { setError((e as Error).message); }
   }
 
-  async function addItem(t: Trip) {
+  async function addItem(t: Trip, presetBookingId?: number | null) {
+    const bookingOptions = directionalBookingOptions(t);
+    const fields: DialogField[] = [
+      { key: "name", label: "Eintrag" },
+      { key: "quantity", label: "Anzahl", type: "number" },
+      { key: "category", label: "Kategorie" },
+    ];
+    if (bookingOptions.length > 0) {
+      fields.push({
+        key: "bookingId",
+        label: "Zugehörigkeit",
+        type: "select",
+        options: [{ value: "", label: "Allgemein" }, ...bookingOptions],
+      });
+    }
+
     const values = await dialog.form({
       title: "Packlisten-Eintrag anlegen",
       submitText: "Anlegen",
-      fields: [
-        { key: "name", label: "Eintrag" },
-        { key: "quantity", label: "Anzahl", type: "number" },
-        { key: "category", label: "Kategorie" },
-      ],
+      fields,
       initial: {
         name: "",
         quantity: "1",
         category: "",
+        bookingId: presetBookingId ? String(presetBookingId) : "",
       },
     });
     if (!values) return;
@@ -242,6 +315,7 @@ export default function Travel() {
         quantity: Number(values.quantity || 1),
         category: String(values.category).trim() || null,
         isPacked: false,
+        bookingId: String(values.bookingId ?? "").trim() ? Number(values.bookingId) : null,
       });
       trips.reload();
     } catch (e) { setError((e as Error).message); }
@@ -325,12 +399,23 @@ export default function Travel() {
             { value: "activity", label: "activity" },
           ],
         },
+        {
+          key: "direction",
+          label: "Richtung",
+          type: "select",
+          options: [
+            { value: "", label: "— keine —" },
+            { value: "outbound", label: "Hinreise / Abreise" },
+            { value: "return", label: "Rückreise / Rückfahrt" },
+          ],
+        },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "amount", label: "Betrag", type: "number" },
       ],
       initial: {
         title: b.title,
         kind: b.kind,
+        direction: b.direction ?? "",
         startsAt: toLocalDateTimeInput(b.startsAt),
         amount: b.amount?.toString() ?? "",
       },
@@ -342,6 +427,7 @@ export default function Travel() {
         ...b,
         title: String(values.title).trim(),
         kind: String(values.kind),
+        direction: String(values.direction).trim() || null,
         startsAt: fromDateTimeInput(values.startsAt),
         amount: String(values.amount).trim() ? Number(values.amount) : null,
       });
@@ -376,12 +462,23 @@ export default function Travel() {
             { value: "activity", label: "activity" },
           ],
         },
+        {
+          key: "direction",
+          label: "Richtung",
+          type: "select",
+          options: [
+            { value: "", label: "— keine —" },
+            { value: "outbound", label: "Hinreise / Abreise" },
+            { value: "return", label: "Rückreise / Rückfahrt" },
+          ],
+        },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "amount", label: "Betrag", type: "number" },
       ],
       initial: {
         title: "",
         kind: "flight",
+        direction: "",
         startsAt: "",
         amount: "",
       },
@@ -394,6 +491,7 @@ export default function Travel() {
       await api.post(`/api/trips/${t.id}/bookings`, {
         title,
         kind: String(values.kind),
+        direction: String(values.direction).trim() || null,
         startsAt: fromDateTimeInput(values.startsAt),
         amount: String(values.amount).trim() ? Number(values.amount) : null,
         currency: "EUR",
@@ -403,17 +501,29 @@ export default function Travel() {
   }
 
   async function editPacking(t: Trip, p: PackingItem) {
+    const bookingOptions = directionalBookingOptions(t);
+    const fields: DialogField[] = [
+      { key: "name", label: "Eintrag" },
+      { key: "quantity", label: "Anzahl", type: "number" },
+      { key: "category", label: "Kategorie" },
+    ];
+    if (bookingOptions.length > 0) {
+      fields.push({
+        key: "bookingId",
+        label: "Zugehörigkeit",
+        type: "select",
+        options: [{ value: "", label: "Allgemein" }, ...bookingOptions],
+      });
+    }
+
     const values = await dialog.form({
       title: "Packlisten-Eintrag bearbeiten",
-      fields: [
-        { key: "name", label: "Eintrag" },
-        { key: "quantity", label: "Anzahl", type: "number" },
-        { key: "category", label: "Kategorie" },
-      ],
+      fields,
       initial: {
         name: p.name,
         quantity: String(p.quantity),
         category: p.category ?? "",
+        bookingId: p.bookingId ? String(p.bookingId) : "",
       },
     });
     if (!values) return;
@@ -423,6 +533,7 @@ export default function Travel() {
         name: String(values.name).trim(),
         quantity: Number(values.quantity),
         category: String(values.category).trim() || null,
+        bookingId: String(values.bookingId ?? "").trim() ? Number(values.bookingId) : null,
       });
       trips.reload();
     } catch (e) { setError((e as Error).message); }
@@ -453,9 +564,19 @@ export default function Travel() {
     );
   }
 
-  const days = daysUntil(trip.startsOn);
+  const { outboundAt, returnAt } = tripLegDates(trip);
+  const phase = tripPhase(outboundAt, returnAt);
   const packed = trip.packingItems.filter((p) => p.isPacked).length;
   const spend = trip.bookings.reduce((s, b) => s + (b.amount ?? 0), 0);
+  const outboundBooking = trip.bookings.find((b) => b.direction === "outbound");
+  const returnBooking = trip.bookings.find((b) => b.direction === "return");
+  const outboundBookingIds = new Set(trip.bookings.filter((b) => b.direction === "outbound").map((b) => b.id));
+  const returnBookingIds = new Set(trip.bookings.filter((b) => b.direction === "return").map((b) => b.id));
+  const outboundPackingItems = trip.packingItems.filter((p) => p.bookingId != null && outboundBookingIds.has(p.bookingId));
+  const returnPackingItems = trip.packingItems.filter((p) => p.bookingId != null && returnBookingIds.has(p.bookingId));
+  // Falls back to "Allgemein" for an item whose booking lost its Hinreise/Rückreise tag later, so it
+  // never becomes invisible instead of just losing its grouping.
+  const generalPackingItems = trip.packingItems.filter((p) => !p.bookingId || (!outboundBookingIds.has(p.bookingId) && !returnBookingIds.has(p.bookingId)));
 
   return (
     <>
@@ -485,7 +606,7 @@ export default function Travel() {
       <ErrorBar message={error ?? trips.error} />
 
       <div className="stats">
-        <Stat label="Abreise" value={countdown(days)} note={shortDate(trip.startsOn)} />
+        <Stat label={phase.label} value={phase.value} note={phase.note} />
         <Stat label="Gepackt" value={`${packed}/${trip.packingItems.length}`}
               note={packed === trip.packingItems.length ? "vollständig" : "noch offen"} />
         <Stat label="Gebucht" value={euro(spend)} note={`${trip.bookings.length} Buchungen`} />
@@ -526,6 +647,7 @@ export default function Travel() {
                             <strong>{b.title}</strong>
                             <div className="alert-msg">
                               <span className="badge">{b.kind}</span>{" "}
+                              {b.direction && <><span className="badge">{b.direction === "outbound" ? "Hinreise" : "Rückreise"}</span>{" "}</>}
                               {b.referenceNo ? `Nr. ${b.referenceNo} · ` : ""}{dateTime(b.startsAt)}
                             </div>
                           </td>
@@ -557,6 +679,7 @@ export default function Travel() {
                       </div>
                       <div className="alert-msg">
                         <span className="badge">{b.kind}</span>{" "}
+                        {b.direction && <><span className="badge">{b.direction === "outbound" ? "Hinreise" : "Rückreise"}</span>{" "}</>}
                         {b.referenceNo ? `Nr. ${b.referenceNo} · ` : ""}{dateTime(b.startsAt)}
                       </div>
                       <div className="action-stack mobile-card-actions">
@@ -577,36 +700,51 @@ export default function Travel() {
         </Section>
 
         <Section title="Packliste">
-          <div className="card">
+          <div className="card" style={{ marginBottom: outboundBooking || returnBooking ? 12 : 0 }}>
             <div className="row" style={{ marginBottom: 10 }}>
+              <strong>Allgemein</strong>
               <div className="spacer" />
               <button className="btn ghost small icon-only" aria-label="Packlisten-Eintrag anlegen" title="Packlisten-Eintrag anlegen" onClick={() => addItem(trip)}>
                 <i className="fa-solid fa-plus" aria-hidden />
                 <span className="sr-only">Packlisten-Eintrag anlegen</span>
               </button>
             </div>
-            <ul className="checklist">
-              {trip.packingItems.map((p) => (
-                <li key={p.id} className={p.isPacked ? "" : "missing"}>
-                  <input type="checkbox" checked={p.isPacked} style={{ width: 16 }}
-                         aria-label={`${p.name} gepackt`}
-                         onChange={() => togglePacked(trip, p)} />
-                  <span style={{ textDecoration: p.isPacked ? "line-through" : "none" }}>
-                    {p.name}{p.quantity > 1 ? ` ×${p.quantity}` : ""}
-                  </span>
-                  <button className="btn ghost small icon-only" aria-label="Packlisten-Eintrag bearbeiten" title="Packlisten-Eintrag bearbeiten" onClick={() => editPacking(trip, p)}>
-                    <i className="fa-solid fa-pen-to-square" aria-hidden />
-                    <span className="sr-only">Bearbeiten</span>
-                  </button>
-                  <button className="btn danger small icon-only" aria-label="Packlisten-Eintrag löschen" title="Packlisten-Eintrag löschen" onClick={() => removePacking(trip, p.id)}>
-                    <i className="fa-solid fa-trash" aria-hidden />
-                    <span className="sr-only">Löschen</span>
-                  </button>
-                  {p.category && <><div className="spacer" /><span className="badge">{p.category}</span></>}
-                </li>
-              ))}
-            </ul>
+            {generalPackingItems.length === 0
+              ? <p className="lede">Keine allgemeinen Einträge.</p>
+              : <PackingChecklist items={generalPackingItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />}
           </div>
+
+          {outboundBooking && (
+            <div className="card" style={{ marginBottom: returnBooking ? 12 : 0 }}>
+              <div className="row" style={{ marginBottom: 10 }}>
+                <strong>Hinreise · {outboundBooking.title}</strong>
+                <div className="spacer" />
+                <button className="btn ghost small icon-only" aria-label="Packlisten-Eintrag für die Hinreise anlegen" title="Packlisten-Eintrag für die Hinreise anlegen" onClick={() => addItem(trip, outboundBooking.id)}>
+                  <i className="fa-solid fa-plus" aria-hidden />
+                  <span className="sr-only">Packlisten-Eintrag für die Hinreise anlegen</span>
+                </button>
+              </div>
+              {outboundPackingItems.length === 0
+                ? <p className="lede">Noch nichts für die Hinreise gepackt.</p>
+                : <PackingChecklist items={outboundPackingItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />}
+            </div>
+          )}
+
+          {returnBooking && (
+            <div className="card">
+              <div className="row" style={{ marginBottom: 10 }}>
+                <strong>Rückreise · {returnBooking.title}</strong>
+                <div className="spacer" />
+                <button className="btn ghost small icon-only" aria-label="Packlisten-Eintrag für die Rückreise anlegen" title="Packlisten-Eintrag für die Rückreise anlegen" onClick={() => addItem(trip, returnBooking.id)}>
+                  <i className="fa-solid fa-plus" aria-hidden />
+                  <span className="sr-only">Packlisten-Eintrag für die Rückreise anlegen</span>
+                </button>
+              </div>
+              {returnPackingItems.length === 0
+                ? <p className="lede">Noch nichts für die Rückreise gepackt.</p>
+                : <PackingChecklist items={returnPackingItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />}
+            </div>
+          )}
         </Section>
       </div>
 

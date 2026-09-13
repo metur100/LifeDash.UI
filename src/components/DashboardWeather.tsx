@@ -56,36 +56,20 @@ const STORAGE_KEY_SELECTED = "ld_weather_selected_city_id";
 
 const DEFAULT_CITIES: CityConfig[] = [
   {
-    id: "berlin-de",
-    name: "Berlin",
+    id: "duesseldorf-de",
+    name: "Düsseldorf",
     country: "Deutschland",
-    latitude: 52.52,
-    longitude: 13.405,
+    latitude: 51.2277,
+    longitude: 6.7735,
     timezone: "Europe/Berlin",
   },
   {
-    id: "sarajevo-ba",
-    name: "Sarajevo",
+    id: "tesanj-ba",
+    name: "Tešanj",
     country: "Bosnien und Herzegowina",
-    latitude: 43.8563,
-    longitude: 18.4131,
+    latitude: 44.6122,
+    longitude: 17.9869,
     timezone: "Europe/Sarajevo",
-  },
-  {
-    id: "new-york-us",
-    name: "New York",
-    country: "Vereinigte Staaten",
-    latitude: 40.7128,
-    longitude: -74.006,
-    timezone: "America/New_York",
-  },
-  {
-    id: "tokyo-jp",
-    name: "Tokio",
-    country: "Japan",
-    latitude: 35.6895,
-    longitude: 139.6917,
-    timezone: "Asia/Tokyo",
   },
 ];
 

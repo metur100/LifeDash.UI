@@ -122,15 +122,18 @@ export interface HomeItem {
   documentId?: number | null; notes?: string | null;
 }
 
+export type BookingDirection = "outbound" | "return";
+
 export interface Booking {
   id: number; tripId: number; kind: string; title: string;
   referenceNo?: string | null; startsAt?: string | null; endsAt?: string | null;
   amount?: number | null; currency: string; documentId?: number | null; notes?: string | null;
+  direction?: BookingDirection | null;
 }
 
 export interface PackingItem {
   id: number; tripId: number; name: string; quantity: number;
-  category?: string | null; isPacked: boolean;
+  category?: string | null; isPacked: boolean; bookingId?: number | null;
 }
 
 export interface Trip {

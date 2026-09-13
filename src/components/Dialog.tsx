@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 type Option = { value: string; label: string };
 
-type DialogField = {
+export type DialogField = {
   key: string;
   label: string;
   type?: "text" | "number" | "date" | "datetime-local" | "select" | "multiselect" | "section";

@@ -33,3 +33,26 @@ export function countdown(days: number | null): string {
 }
 
 export const severityLabel = ["Hinweis", "Bald", "Dringend", "Überfällig"];
+
+export type TripPhaseResult = { label: string; value: string; note: string };
+
+// A trip that has already departed shouldn't keep showing "Abreise ... überfällig" forever once a
+// return leg is known — once the outbound date has passed, the stat switches to counting down the
+// return leg instead, and once that has passed too it reports the trip as finished.
+export function tripPhase(outboundAt: string | null, returnAt: string | null): TripPhaseResult {
+  const outboundDays = daysUntil(outboundAt);
+  const returnDays = returnAt ? daysUntil(returnAt) : null;
+  const hasDeparted = outboundDays !== null && outboundDays < 0;
+  const hasReturned = returnDays !== null && returnDays < 0;
+
+  if (!hasDeparted) {
+    return { label: "Abreise", value: countdown(outboundDays), note: shortDate(outboundAt) };
+  }
+  if (returnAt && !hasReturned) {
+    return { label: "Rückreise", value: countdown(returnDays), note: shortDate(returnAt) };
+  }
+  if (returnAt && hasReturned) {
+    return { label: "Reise beendet", value: `seit ${Math.abs(returnDays!)} Tagen`, note: shortDate(returnAt) };
+  }
+  return { label: "Unterwegs", value: "kein Rückreisedatum", note: shortDate(outboundAt) };
+}
