@@ -7,7 +7,14 @@ import { countdown } from "../lib/format";
  * timeline. Pins are positioned on a sqrt scale so the next two weeks get
  * room to breathe while distant items still stay visible.
  */
-export default function Horizon({ alerts, horizon = 120 }:
+function scaleLabels(horizon: number): string[] {
+  if (horizon <= 14) return ["heute", `${Math.round(horizon / 2)} Tage`, `${horizon} Tage`];
+  if (horizon <= 30) return ["heute", "1 Woche", "2 Wochen", "3 Wochen", `${horizon} Tage`];
+  if (horizon <= 60) return ["heute", "1 Woche", "2 Wochen", "1 Monat", `${horizon} Tage`];
+  return ["heute", "1 Woche", "1 Monat", "2 Monate", `${horizon} Tage`];
+}
+
+export default function Horizon({ alerts, horizon = 30 }:
   { alerts: Alert[]; horizon?: number }) {
   const navigate = useNavigate();
 
@@ -23,10 +30,10 @@ export default function Horizon({ alerts, horizon = 120 }:
       <div className="horizon-head">
         <span className="horizon-title">Fristen-Horizont · nächste {horizon} Tage</span>
         <div className="horizon-legend" aria-hidden>
-          <span title="Termin oder Frist liegt bereits in der Vergangenheit — sofort erledigen."><i className="dot" style={{ background: "var(--stamp)" }} />überfällig</span>
-          <span title="Fällig in den nächsten 7 Tagen."><i className="dot" style={{ background: "var(--amber)" }} />dringend</span>
-          <span title="Fällig innerhalb der Erinnerungsfrist des Eintrags (mindestens 14 Tage)."><i className="dot" style={{ background: "var(--indigo)" }} />bald</span>
-          <span title="Liegt weiter in der Zukunft, aber noch im Anzeigezeitraum."><i className="dot" style={{ background: "var(--ink-soft)" }} />Hinweis</span>
+          <span title="Termin oder Frist liegt bereits in der Vergangenheit — sofort erledigen."><i className="dot" style={{ background: "var(--danger)" }} />überfällig</span>
+          <span title="Fällig in den nächsten 7 Tagen."><i className="dot" style={{ background: "var(--warning)" }} />dringend</span>
+          <span title="Fällig innerhalb der Erinnerungsfrist des Eintrags (mindestens 14 Tage)."><i className="dot" style={{ background: "var(--accent)" }} />bald</span>
+          <span title="Liegt weiter in der Zukunft, aber noch im Anzeigezeitraum."><i className="dot" style={{ background: "var(--text-soft)" }} />Hinweis</span>
         </div>
       </div>
 
@@ -48,8 +55,9 @@ export default function Horizon({ alerts, horizon = 120 }:
       </div>
 
       <div className="track-scale" aria-hidden>
-        <span>heute</span><span>1 Woche</span><span>1 Monat</span>
-        <span>2 Monate</span><span>{horizon} Tage</span>
+        {scaleLabels(horizon).map((label) => (
+          <span key={label}>{label}</span>
+        ))}
       </div>
     </div>
   );

@@ -52,7 +52,7 @@ export default function Dashboard({ onCount }: { onCount?: (n: number) => void }
         lede="Alle Fristen aus Familie, Behörden, Finanzen und Reisen an einem Ort — nach Dringlichkeit sortiert."
       />
 
-      <Horizon alerts={data.alerts} horizon={120} />
+      <Horizon alerts={data.alerts} horizon={30} />
 
       <DashboardDeliveries />
 

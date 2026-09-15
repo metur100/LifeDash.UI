@@ -322,44 +322,46 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
   margin-bottom: 20px;
 }
 .horizon-title { font-family: var(--display); font-size: 18px; font-weight: 600; }
-.horizon-legend { display: flex; gap: 14px; font-family: var(--mono); font-size: 10.5px; color: var(--text-soft); }
-.horizon-legend span { display: flex; align-items: center; gap: 5px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.horizon-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--text); }
+.horizon-legend span { display: flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 15%, transparent); }
 
-.track { position: relative; height: 74px; margin: 0 4px; }
+.track { position: relative; height: 96px; margin: 0 4px; }
 .track-line {
   position: absolute;
   left: 0;
   right: 0;
-  top: 34px;
-  height: 2px;
+  top: 44px;
+  height: 3px;
+  border-radius: 2px;
   background: var(--line);
 }
 .track-today {
   position: absolute;
-  top: 12px;
-  bottom: 20px;
+  top: 14px;
+  bottom: 24px;
   width: 2px;
   background: var(--text);
 }
 .track-today::after {
   content: "heute";
   position: absolute;
-  top: -14px;
+  top: -16px;
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text);
 }
 .pin {
   position: absolute;
-  top: 22px;
+  top: 26px;
   transform: translateX(-50%);
-  width: 12px;
-  height: 26px;
+  width: 18px;
+  height: 34px;
   padding: 0;
   border: none;
   background: none;
@@ -368,18 +370,19 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
 .pin i {
   display: block;
   width: 2px;
-  height: 14px;
+  height: 18px;
   margin: 0 auto;
   background: currentColor;
-  opacity: 0.55;
+  opacity: 0.65;
 }
 .pin b {
   display: block;
-  width: 11px;
-  height: 11px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: currentColor;
-  border: 2px solid var(--card);
+  border: 3px solid var(--card);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   margin: -1px auto 0;
 }
 .pin:hover b, .pin:focus-visible b { transform: scale(1.35); }
@@ -393,10 +396,11 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
   display: flex;
   justify-content: space-between;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--text-soft);
   border-top: 1px dashed var(--line);
-  padding-top: 6px;
+  padding-top: 8px;
   margin: 0 4px;
 }
 

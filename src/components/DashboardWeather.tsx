@@ -229,6 +229,24 @@ export default function DashboardWeather() {
     };
   }, [activeCity?.id, activeCity?.latitude, activeCity?.longitude, activeCity?.timezone]);
 
+  function cityHourIso(date: Date, timeZone?: string) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timeZone || "Europe/Berlin",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        hour12: false,
+      }).formatToParts(date);
+      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+      const hour = get("hour") === "24" ? "00" : get("hour");
+      return `${get("year")}-${get("month")}-${get("day")}T${hour}:00`;
+    } catch {
+      return "";
+    }
+  }
+
   function getCityTime(timeZone?: string) {
     try {
       return new Intl.DateTimeFormat("de-DE", {
@@ -379,6 +397,18 @@ export default function DashboardWeather() {
   const currentCondition = weather
     ? getWeatherDescription(weather.weatherCode)
     : { text: "", icon: "fa-cloud" };
+
+  // Open-Meteo's "current" block has no precipitation probability, only the
+  // daily max — that made "Regenrisiko" show the whole day's peak chance
+  // (often 0 on a dry day) instead of the actual current risk. Look up the
+  // hourly forecast slot matching the city's current hour instead.
+  const currentPrecipitationProb = useMemo(() => {
+    if (!weather) return 0;
+    const iso = cityHourIso(now, activeCity?.timezone);
+    const idx = weather.hourly.time.findIndex((t) => t.startsWith(iso));
+    if (idx >= 0) return weather.hourly.precipitationProb[idx] ?? 0;
+    return weather.daily.precipitationProbabilityMax[0] ?? 0;
+  }, [weather, now, activeCity?.timezone]);
 
   const selectedDateFormatted = useMemo(() => {
     if (!weather?.daily.time[selectedDayIndex]) return "";
@@ -581,7 +611,7 @@ export default function DashboardWeather() {
                 <div className="metric-data">
                   <span className="metric-label">Regenrisiko</span>
                   <span className="metric-val">
-                    {weather.daily.precipitationProbabilityMax[0] ?? 0}%
+                    {currentPrecipitationProb}%
                   </span>
                 </div>
               </div>
