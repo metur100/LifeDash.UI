@@ -7,7 +7,7 @@ system lives in `src/styles/app.css`.
 
     npm install
     cp .env.example .env      # set VITE_API_URL to your backend
-    npm run dev               # http://localhost:5173
+    npm run dev               # http://localhost:5273
 
 ## Build
 

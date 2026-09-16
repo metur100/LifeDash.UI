@@ -2,7 +2,7 @@
 import { api } from "../api/client";
 import type { FixedCost, Income, Payment } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { CadenceStackedChart, CostBreakdownDonut, IncomeCostChart } from "../components/FinanceCharts";
+import { CostBreakdownDonut, CostHistoryChart, IncomeCostChart } from "../components/FinanceCharts";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { countdown, daysUntil, euro, localDateIso, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -325,10 +325,6 @@ export default function Finance() {
     const oneTimeThisYear = openPayments
       .filter((p) => Number(p.dueOn.slice(0, 4)) === year)
       .reduce((s, p) => s + p.amount, 0);
-    const yearMonth = today().slice(0, 7);
-    const oneTimeThisMonth = openPayments
-      .filter((p) => p.dueOn.slice(0, 7) === yearMonth)
-      .reduce((s, p) => s + p.amount, 0);
 
     const leftMonth = monthIncome - monthCosts;
     const leftYear = yearIncome - yearCosts - oneTimeThisYear;
@@ -338,8 +334,6 @@ export default function Finance() {
       yearIncome,
       monthCosts,
       yearCosts,
-      oneTimeThisMonth,
-      oneTimeThisYear,
       leftMonth,
       leftYear,
     };
@@ -947,8 +941,7 @@ export default function Finance() {
         <IncomeCostChart monthIncome={overview.monthIncome} monthCosts={overview.monthCosts}
                          yearIncome={overview.yearIncome} yearCosts={overview.yearCosts} />
         <CostBreakdownDonut categories={costBreakdown} />
-        <CadenceStackedChart monthRecurring={overview.monthCosts} monthOneTime={overview.oneTimeThisMonth}
-                              yearRecurring={overview.yearCosts} yearOneTime={overview.oneTimeThisYear} />
+        <CostHistoryChart paid={paid} />
       </div>
 
       <Section
