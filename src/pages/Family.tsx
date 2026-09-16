@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Appointment, FamilyMember, ImportantDate } from "../api/types";
 import { useDialog } from "../components/Dialog";
+import { AgeDistributionChart, AppointmentCategoryDonut, AppointmentLoadChart, FamilyTree, ImportantDatesTimeline } from "../components/FamilyCharts";
 import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
 import { countdown, dateTime, daysUntil, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -895,6 +896,29 @@ export default function Family() {
     .filter((a) => a.isDone)
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   const memberNameById = new Map((members.data ?? []).map((m) => [m.id, m.fullName]));
+
+  const appointmentCategoryData = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of (appts.data ?? [])) {
+      if (a.isDone) continue;
+      const key = normalizeCategory(a.category);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return APPOINTMENT_CATEGORIES
+      .map((c) => [c.label, counts.get(c.value) ?? 0] as [string, number])
+      .filter(([, value]) => value > 0);
+  }, [appts.data]);
+
+  const importantDateTimelineItems = useMemo(() => {
+    return (dates.data ?? [])
+      .map((d) => {
+        const iso = nextImportantOccurrence(d);
+        const offsetDays = daysUntil(iso) ?? -1;
+        return { id: d.id, title: d.title, category: (d.category || "other").toLowerCase(), offsetDays, iso };
+      })
+      .filter((x) => x.offsetDays >= 0 && x.offsetDays <= 365);
+  }, [dates.data]);
+
   const apptByDay = useMemo(() => {
     const map = new Map<string, Appointment[]>();
     for (const a of (appts.data ?? []).filter((x) => !x.isDone)) {
@@ -978,6 +1002,16 @@ export default function Family() {
       <PageHead eyebrow="Familie" title="Wer wann was braucht"
         lede="Personen, Termine und wichtige Daten fuer dein Familien- und Erwachsenenleben." />
       <ErrorBar message={error ?? members.error ?? appts.error} />
+
+      <div className="chart-row">
+        <FamilyTree members={members.data ?? []} />
+        <AgeDistributionChart members={members.data ?? []} />
+      </div>
+
+      <div className="chart-row">
+        <AppointmentCategoryDonut categories={appointmentCategoryData} />
+        <AppointmentLoadChart appointments={appts.data ?? []} horizonDays={91} />
+      </div>
 
       <Section title="Personen" action={<button className="btn icon-only" aria-label="Person hinzufügen" title="Person hinzufügen" onClick={addMember}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Person hinzufügen</span></button>}>
         {(members.data ?? []).length === 0
@@ -1250,6 +1284,8 @@ export default function Family() {
           )}
         </Section>
       </div>
+
+      <ImportantDatesTimeline items={importantDateTimelineItems} />
 
       <Section title="Wichtige Anlässe" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
         {(dates.data ?? []).length === 0

@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { ContractFlowType, FamilyMember, Subscription } from "../api/types";
+import ContractsTimeline from "../components/ContractsTimeline";
 import { useDialog } from "../components/Dialog";
+import { CostBreakdownDonut } from "../components/FinanceCharts";
 import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
 import { euro, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -28,6 +30,12 @@ function cadenceLabel(cadence: string): string {
   return cadence;
 }
 
+function monthlyAmount(amount: number, cadence: string): number {
+  if (cadence === "quarterly") return amount / 3;
+  if (cadence === "yearly") return amount / 12;
+  return amount;
+}
+
 export default function Contracts() {
   const contracts = useAsync<Subscription[]>(() => api.get("/api/subscriptions"), []);
   const members = useAsync<FamilyMember[]>(() => api.get("/api/family-members"), []);
@@ -42,6 +50,18 @@ export default function Contracts() {
       memberName: s.familyMemberId ? (memberNameById.get(s.familyMemberId) ?? "-") : "-",
     })).sort((a, b) => (a.s.startOn || "9999-12-31").localeCompare(b.s.startOn || "9999-12-31"));
   }, [contracts.data, memberNameById]);
+
+  const costBreakdown = useMemo(() => {
+    const active = (contracts.data ?? []).filter((s) => s.isActive && s.flowType === "cost" && (s.amount ?? 0) > 0);
+    const byAmountDesc = active
+      .map((s) => [s.name, monthlyAmount(s.amount ?? 0, s.cadence)] as [string, number])
+      .sort((a, b) => b[1] - a[1]);
+
+    const MAX_SLICES = 7;
+    const shown = byAmountDesc.slice(0, MAX_SLICES).sort((a, b) => a[0].localeCompare(b[0]));
+    const rest = byAmountDesc.slice(MAX_SLICES).reduce((sum, [, amount]) => sum + amount, 0);
+    return rest > 0.005 ? [...shown, ["Andere", rest] as [string, number]] : shown;
+  }, [contracts.data]);
 
   function contractFields(memberOptions: Array<{ value: string; label: string }>) {
     return [
@@ -188,6 +208,12 @@ export default function Contracts() {
         lede="Verträge, Laufzeiten und Hinweise im Blick — unabhängig davon, ob sie Geld kosten, einbringen oder gar nichts bewegen."
       />
       <ErrorBar message={error ?? contracts.error ?? members.error} />
+
+      <ContractsTimeline subscriptions={contracts.data ?? []} />
+
+      <div className="chart-row">
+        <CostBreakdownDonut categories={costBreakdown} />
+      </div>
 
       <Section title="Verträge" action={<button className="btn icon-only" aria-label="Vertrag hinzufügen" title="Vertrag hinzufügen" onClick={addContract}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Vertrag hinzufügen</span></button>}>
         {rows.length === 0

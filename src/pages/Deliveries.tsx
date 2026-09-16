@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDialog } from "../components/Dialog";
+import { PackageStatusDonut, PackagesByCarrierChart } from "../components/DeliveryCharts";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { daysUntil, dateTime, shortDate } from "../lib/format";
 import { api } from "../api/client";
@@ -617,6 +618,11 @@ export default function Deliveries() {
           value="DHL · DPD · Hermes · GLS"
           note="Automatische Erkennung"
         />
+      </div>
+
+      <div className="chart-row">
+        <PackageStatusDonut packages={packages} />
+        <PackagesByCarrierChart packages={packages} />
       </div>
 
       {/* Filters */}
