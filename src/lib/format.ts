@@ -5,6 +5,12 @@ export const shortDate = (iso?: string | null) =>
   iso ? new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })
         .format(new Date(iso)) : "—";
 
+export const shortDayMonth = (iso?: string | null) =>
+  iso ? new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(new Date(iso)) : "—";
+
+export const monthLabel = (iso?: string | null) =>
+  iso ? new Intl.DateTimeFormat("de-DE", { month: "short" }).format(new Date(iso)) : "—";
+
 export const dateTime = (iso?: string | null) =>
   iso ? new Intl.DateTimeFormat("de-DE", {
         day: "2-digit", month: "2-digit", year: "numeric",

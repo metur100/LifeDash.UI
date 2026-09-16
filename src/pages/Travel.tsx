@@ -5,6 +5,7 @@ import type { Booking, PackingItem, Trip } from "../api/types";
 import type { DialogField } from "../components/Dialog";
 import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
+import TripsTimeline from "../components/TripsTimeline";
 import { dateTime, daysUntil, euro, shortDate, tripPhase } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
@@ -548,7 +549,7 @@ export default function Travel() {
     } catch (e) { setError((e as Error).message); }
   }
 
-  if (trips.loading) return <p className="lede">Wird geladen …</p>;
+  if (trips.loading && trips.data === null) return <p className="lede">Wird geladen …</p>;
 
   if (!trip) {
     return (
@@ -563,6 +564,8 @@ export default function Travel() {
       </>
     );
   }
+
+  const timeline = <TripsTimeline trips={list} />;
 
   const { outboundAt, returnAt } = tripLegDates(trip);
   const phase = tripPhase(outboundAt, returnAt);
@@ -580,6 +583,7 @@ export default function Travel() {
 
   return (
     <>
+      {timeline}
       {list.length > 0 && <div className="trip-picker">
         <label htmlFor="trip-picker">Reise auswählen</label>
         <div><i className="fa-solid fa-magnifying-glass" aria-hidden /><input id="trip-picker" value={tripSearch} onFocus={() => setTripPickerOpen(true)} onChange={(event) => { setTripSearch(event.target.value); setTripPickerOpen(true); }} onBlur={() => window.setTimeout(() => setTripPickerOpen(false), 150)} placeholder="Reise suchen" autoComplete="off" />{tripSearch && <button className="trip-picker-clear" type="button" aria-label="Reisesuche löschen" title="Reisesuche löschen" onMouseDown={(event) => event.preventDefault()} onClick={() => { setTripSearch(""); setTripPickerOpen(true); }}><i className="fa-solid fa-xmark" aria-hidden /></button>}</div>

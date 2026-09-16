@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { DashboardResponse } from "../api/types";
 import AlertRow from "../components/AlertRow";
+import { AlertCompositionChart, UpcomingLoadChart } from "../components/DashboardCharts";
 import DashboardDeliveries from "../components/DashboardDeliveries";
 import DashboardWeather from "../components/DashboardWeather";
 import Horizon from "../components/Horizon";
@@ -20,10 +21,12 @@ const filters = [
   { id: "travel", label: "Reisen" },
 ];
 
+const HORIZON_DAYS = 120;
+
 export default function Dashboard({ onCount }: { onCount?: (n: number) => void }) {
   const [filter, setFilter] = useState("all");
   const { data, error, loading } = useAsync<DashboardResponse>(
-    () => api.get<DashboardResponse>("/api/dashboard?horizonDays=120"), []);
+    () => api.get<DashboardResponse>(`/api/dashboard?horizonDays=${HORIZON_DAYS}`), []);
 
   const urgentCount = data
     ? data.summary.overdue + data.summary.urgent
@@ -72,6 +75,11 @@ export default function Dashboard({ onCount }: { onCount?: (n: number) => void }
         {s.nextTripTitle && (
           <Stat label="Nächste Reise" value={`${s.nextTripInDays} Tage`} note={s.nextTripTitle} />
         )}
+      </div>
+
+      <div className="chart-row">
+        <AlertCompositionChart alerts={data.alerts} />
+        <UpcomingLoadChart alerts={data.alerts} horizonDays={HORIZON_DAYS} />
       </div>
 
       {data.insights.length > 0 && (

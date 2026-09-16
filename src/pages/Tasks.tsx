@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import type { TaskItem } from "../api/types";
 import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead } from "../components/Ui";
+import TaskCompletionDonuts from "../components/TaskCompletionDonuts";
 import { countdown, daysUntil, shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
@@ -131,6 +132,8 @@ export default function Tasks() {
           </button>
         </>} />
       <ErrorBar message={error ?? tasks.error} />
+
+      <TaskCompletionDonuts tasks={tasks.data ?? []} />
 
       <div className="card">
         {list.length === 0

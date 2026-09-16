@@ -2,6 +2,7 @@
 import { api } from "../api/client";
 import type { FixedCost, Income, Payment } from "../api/types";
 import { useDialog } from "../components/Dialog";
+import { CadenceStackedChart, CostBreakdownDonut, IncomeCostChart } from "../components/FinanceCharts";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { countdown, daysUntil, euro, localDateIso, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -324,6 +325,10 @@ export default function Finance() {
     const oneTimeThisYear = openPayments
       .filter((p) => Number(p.dueOn.slice(0, 4)) === year)
       .reduce((s, p) => s + p.amount, 0);
+    const yearMonth = today().slice(0, 7);
+    const oneTimeThisMonth = openPayments
+      .filter((p) => p.dueOn.slice(0, 7) === yearMonth)
+      .reduce((s, p) => s + p.amount, 0);
 
     const leftMonth = monthIncome - monthCosts;
     const leftYear = yearIncome - yearCosts - oneTimeThisYear;
@@ -333,10 +338,29 @@ export default function Finance() {
       yearIncome,
       monthCosts,
       yearCosts,
+      oneTimeThisMonth,
+      oneTimeThisYear,
       leftMonth,
       leftYear,
     };
   }, [incomes.data, costLines, payments.data]);
+
+  const costBreakdown = useMemo(() => {
+    const active = costLines.filter((c) => c.isActive);
+    const byCategory = new Map<string, number>();
+    for (const c of active) {
+      const key = c.category || "Sonstiges";
+      byCategory.set(key, (byCategory.get(key) ?? 0) + monthly(c.amount, c.cadence));
+    }
+    const byAmountDesc = [...byCategory.entries()]
+      .filter(([, amount]) => amount > 0)
+      .sort((a, b) => b[1] - a[1]);
+
+    const MAX_SLICES = 7;
+    const shown = byAmountDesc.slice(0, MAX_SLICES).sort((a, b) => a[0].localeCompare(b[0]));
+    const rest = byAmountDesc.slice(MAX_SLICES).reduce((s, [, amount]) => s + amount, 0);
+    return rest > 0.005 ? [...shown, ["Andere", rest] as [string, number]] : shown;
+  }, [costLines]);
 
   const upcoming = useMemo<UpcomingItem[]>(() => {
     const allPayments = payments.data ?? [];
@@ -917,6 +941,14 @@ export default function Finance() {
         <Stat label="Laufende Kosten / Jahr" value={euro(overview.yearCosts)} />
         <Stat className="wide" label="Bleibt übrig / Monat" value={euro(overview.leftMonth)} tone={overview.leftMonth < 0 ? "neg" : "pos"} />
         <Stat className="wide" label="Bleibt übrig / Jahr" value={euro(overview.leftYear)} tone={overview.leftYear < 0 ? "neg" : "pos"} />
+      </div>
+
+      <div className="chart-row">
+        <IncomeCostChart monthIncome={overview.monthIncome} monthCosts={overview.monthCosts}
+                         yearIncome={overview.yearIncome} yearCosts={overview.yearCosts} />
+        <CostBreakdownDonut categories={costBreakdown} />
+        <CadenceStackedChart monthRecurring={overview.monthCosts} monthOneTime={overview.oneTimeThisMonth}
+                              yearRecurring={overview.yearCosts} yearOneTime={overview.oneTimeThisYear} />
       </div>
 
       <Section

@@ -2925,3 +2925,65 @@ textarea { min-height: 70px; resize: vertical; }
 .delivery-date-tag strong {
   color: var(--accent);
 }
+
+/* ===================================================================
+   Charts (Recharts) - shared chrome around the library's SVG output.
+   =================================================================== */
+.chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.chart-box { width: 100%; height: 220px; }
+.chart-box.small { height: 170px; }
+.chart-title { font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 0 0 4px; }
+.chart-card-inner { display: flex; flex-direction: column; }
+
+.chart-tooltip {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 12.5px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+.chart-tooltip .tt-label { font-weight: 600; margin-bottom: 4px; }
+.chart-tooltip .tt-row { display: flex; align-items: center; gap: 6px; }
+.chart-tooltip .tt-row + .tt-row { margin-top: 2px; }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: 7px 16px; margin-top: 10px; font-size: 12px; color: var(--text-soft); }
+.chart-legend span { display: flex; align-items: center; gap: 6px; }
+.chart-legend strong { color: var(--text); font-weight: 600; }
+
+.donut-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 16px; text-align: center; }
+.donut-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.donut-cell .chart-box { width: 92px; height: 92px; position: relative; }
+.donut-pct {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 16px; font-weight: 700; pointer-events: none;
+}
+.donut-cell-label { font-size: 12px; color: var(--text-soft); }
+.donut-cell-note { font-size: 11px; color: var(--text-soft); }
+
+.gantt { display: flex; flex-direction: column; gap: 10px; }
+.gantt-row { display: grid; grid-template-columns: minmax(90px, 160px) 1fr; align-items: center; gap: 10px; }
+.gantt-label { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gantt-label strong { display: block; color: var(--text); }
+.gantt-label span { color: var(--text-soft); font-size: 11px; }
+.gantt-track { position: relative; height: 22px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; }
+.gantt-bar {
+  position: absolute; top: 3px; bottom: 3px; border-radius: 5px;
+  background: var(--accent); min-width: 6px;
+}
+.gantt-bar.done { opacity: 0.55; }
+.gantt-bar.current { background: var(--ok); }
+.gantt-label { text-decoration: none; color: inherit; }
+.gantt-today { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--danger); }
+.gantt-today::after {
+  content: "heute"; position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; color: var(--danger); white-space: nowrap;
+}
+.gantt-axis { display: grid; grid-template-columns: minmax(90px, 160px) 1fr; gap: 10px; }
+.gantt-axis-track { position: relative; height: 14px; }
+.gantt-axis-tick { position: absolute; top: 0; font-size: 10.5px; color: var(--text-soft); transform: translateX(-50%); }
+
+@media (max-width: 640px) {
+  .gantt-row, .gantt-axis { grid-template-columns: 84px 1fr; }
+}

@@ -366,7 +366,7 @@ export default function Mail() {
     if (mode !== "new" && selected) {
       setRecipient(mode === "reply" ? addressFromHeader(headerValue(selected, "Reply-To") || headerValue(selected, "From")) : "");
       const originalSubject = headerValue(selected, "Subject") || "(Ohne Betreff)";
-      setSubject(`${mode === "reply" ? "Re: " : "Fwd: "}${originalSubject.replace(/^(Re: |Fwd: )/i, "")}`);
+      setSubject(`${mode === "reply" ? "AW: " : "WG: "}${originalSubject.replace(/^(Re|Fwd|AW|WG): /i, "")}`);
       setBody(mode === "forward" ? `\n\n--- Weitergeleitete Nachricht ---\nVon: ${headerValue(selected, "From")}\nDatum: ${headerValue(selected, "Date")}\nBetreff: ${originalSubject}\n\n${selected.snippet ?? ""}` : "");
     }
     setComposerOpen(true);
