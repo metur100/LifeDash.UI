@@ -39,7 +39,7 @@ const DARK = {
 export type ChartPalette = typeof LIGHT;
 
 // Same severity → color mapping already established in Horizon.tsx / app.css
-// (sev-0..3): Hinweis/Bald/Dringend/Überfällig.
+// (sev-0..3): Später/Bald/Dringend/Überfällig.
 export function severityColor(p: ChartPalette, severity: number): string {
   if (severity === 3) return p.danger;
   if (severity === 2) return p.warning;

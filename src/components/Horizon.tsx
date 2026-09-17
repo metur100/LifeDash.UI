@@ -33,7 +33,7 @@ export default function Horizon({ alerts, horizon = 30 }:
           <span title="Termin oder Frist liegt bereits in der Vergangenheit — sofort erledigen."><i className="dot" style={{ background: "var(--danger)" }} />überfällig</span>
           <span title="Fällig in den nächsten 7 Tagen."><i className="dot" style={{ background: "var(--warning)" }} />dringend</span>
           <span title="Fällig in 8 bis 20 Tagen."><i className="dot" style={{ background: "var(--accent)" }} />bald</span>
-          <span title="Liegt weiter in der Zukunft, aber noch im Anzeigezeitraum."><i className="dot" style={{ background: "var(--text-soft)" }} />Hinweis</span>
+          <span title="Liegt weiter in der Zukunft, aber noch im Anzeigezeitraum."><i className="dot" style={{ background: "var(--text-soft)" }} />später</span>
         </div>
       </div>
 

@@ -38,7 +38,7 @@ export function countdown(days: number | null): string {
   return `in ${days} Tagen`;
 }
 
-export const severityLabel = ["Hinweis", "Bald", "Dringend", "Überfällig"];
+export const severityLabel = ["Später", "Bald", "Dringend", "Überfällig"];
 
 export type TripPhaseResult = { label: string; value: string; note: string };
 
