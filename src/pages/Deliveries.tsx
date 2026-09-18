@@ -5,7 +5,7 @@ import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { daysUntil, dateTime, shortDate } from "../lib/format";
 import { api } from "../api/client";
 
-export type CarrierType = "dhl" | "dpd" | "hermes" | "gls" | "other";
+export type CarrierType = "dhl" | "dpd" | "hermes" | "gls" | "deutschepost" | "other";
 
 export type PackageStatus =
   | "announced" // Elektronisch angekündigt
@@ -76,6 +76,15 @@ const CARRIER_INFO: Record<
         num
       )}`,
   },
+  deutschepost: {
+    name: "Deutsche Post (Brief)",
+    icon: "fa-solid fa-envelope",
+    color: "#ffcc00",
+    trackUrl: (num) =>
+      `https://www.deutschepost.de/sendung/simpleQuery.html?form.sendungsnummer=${encodeURIComponent(
+        num
+      )}`,
+  },
   other: {
     name: "Andere",
     icon: "fa-solid fa-cube",
@@ -104,6 +113,9 @@ export function autoDetectCarrier(trackingNumber: string): CarrierType {
   }
   if (clean.startsWith("H100") || (clean.length >= 11 && clean.length <= 14 && clean.startsWith("01"))) {
     return "hermes";
+  }
+  if (/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/.test(clean)) {
+    return "deutschepost";
   }
   if (clean.length === 14 && (clean.startsWith("0") || clean.startsWith("1"))) {
     return "dpd";
@@ -319,6 +331,7 @@ export default function Deliveries() {
             { label: "DPD", value: "dpd" },
             { label: "Hermes", value: "hermes" },
             { label: "GLS", value: "gls" },
+            { label: "Deutsche Post (Brief)", value: "deutschepost" },
             { label: "Andere", value: "other" },
           ],
         },
@@ -399,6 +412,7 @@ export default function Deliveries() {
             { label: "DPD", value: "dpd" },
             { label: "Hermes", value: "hermes" },
             { label: "GLS", value: "gls" },
+            { label: "Deutsche Post (Brief)", value: "deutschepost" },
             { label: "Andere", value: "other" },
           ],
         },
@@ -678,6 +692,12 @@ export default function Deliveries() {
             onClick={() => setCarrierFilter("gls")}
           >
             GLS
+          </button>
+          <button
+            className={`chip ${carrierFilter === "deutschepost" ? "on" : ""}`}
+            onClick={() => setCarrierFilter("deutschepost")}
+          >
+            Deutsche Post
           </button>
         </div>
       </div>

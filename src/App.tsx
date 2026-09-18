@@ -12,6 +12,7 @@ import Finance from "./pages/Finance";
 import Login from "./pages/Login";
 import Mail from "./pages/Mail";
 import Tasks from "./pages/Tasks";
+import Termine from "./pages/Termine";
 import Travel from "./pages/Travel";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -32,6 +33,7 @@ export default function App() {
         <Route element={<Layout alertCount={alertCount} />}>
           <Route index element={<Dashboard onCount={setAlertCount} />} />
           <Route path="family" element={<Family />} />
+          <Route path="termine" element={<Termine />} />
           <Route path="authorities" element={<Authorities />} />
           <Route path="authorities/:id" element={<Authorities />} />
           <Route path="finance" element={<Finance />} />

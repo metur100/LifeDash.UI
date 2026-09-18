@@ -158,7 +158,7 @@ export function ImportantDatesTimeline({ items }: { items: ImportantTimelineItem
   );
 }
 
-function ageFromBirthDate(iso?: string | null): number | null {
+export function ageFromBirthDate(iso?: string | null): number | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;

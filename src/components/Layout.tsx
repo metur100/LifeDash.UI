@@ -8,6 +8,7 @@ import { useTheme } from "./ThemeContext";
 const links = [
   { to: "/", label: "Übersicht", icon: "fa-solid fa-table-columns", end: true },
   { to: "/family", label: "Familie", icon: "fa-solid fa-people-group" },
+  { to: "/termine", label: "Termine", icon: "fa-solid fa-calendar-days" },
   { to: "/authorities", label: "Behörden", icon: "fa-solid fa-building-shield" },
   { to: "/finance", label: "Finanzen", icon: "fa-solid fa-wallet" },
   { to: "/contracts", label: "Verträge", icon: "fa-solid fa-file-signature" },

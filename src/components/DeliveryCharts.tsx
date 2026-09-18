@@ -71,10 +71,11 @@ const CARRIER_LABEL: Record<CarrierType, string> = {
   dpd: "DPD",
   hermes: "Hermes",
   gls: "GLS",
+  deutschepost: "Deutsche Post",
   other: "Andere",
 };
 
-const CARRIER_ORDER: CarrierType[] = ["dhl", "dpd", "hermes", "gls", "other"];
+const CARRIER_ORDER: CarrierType[] = ["dhl", "dpd", "hermes", "gls", "deutschepost", "other"];
 
 export function PackagesByCarrierChart({ packages }: { packages: PackageItem[] }) {
   const palette = useChartPalette();
