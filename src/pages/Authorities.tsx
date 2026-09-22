@@ -5,6 +5,7 @@ import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead } from "../components/Ui";
 import { countdown, daysUntil, shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { useCustomOptions } from "../lib/useCustomOptions";
 
 const caseLabels: Record<string, string> = {
   Einbuergerung: "Einbürgerung", Aufenthalt: "Aufenthalt",
@@ -36,6 +37,12 @@ export default function Authorities() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "closed">("open");
+  const customCaseTypes = useCustomOptions("authority-case-type");
+  const caseTypeOptions = [
+    ...Object.entries(caseLabels).map(([value, label]) => ({ value, label })),
+    ...customCaseTypes.options,
+  ];
+  const caseTypeLabel = (type: string) => caseTypeOptions.find((o) => o.value === type)?.label ?? type;
 
   async function createCase() {
     const values = await dialog.form({
@@ -47,7 +54,8 @@ export default function Authorities() {
           key: "caseType",
           label: "Typ",
           type: "select",
-          options: Object.entries(caseLabels).map(([value, label]) => ({ value, label })),
+          options: caseTypeOptions,
+          allowCustomOption: { onAdd: (label) => customCaseTypes.add(label, caseTypeOptions) },
         },
         { key: "authority", label: "Behörde" },
         { key: "referenceNo", label: "Aktenzeichen" },
@@ -100,7 +108,8 @@ export default function Authorities() {
           key: "caseType",
           label: "Typ",
           type: "select",
-          options: Object.entries(caseLabels).map(([value, label]) => ({ value, label })),
+          options: caseTypeOptions,
+          allowCustomOption: { onAdd: (label) => customCaseTypes.add(label, caseTypeOptions) },
         },
         { key: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
         { key: "authority", label: "Behörde" },
@@ -181,8 +190,8 @@ export default function Authorities() {
 
       <div className="filters">
         <button className={`chip ${filter === "all" ? "on" : ""}`} onClick={() => setFilter("all")}>Alle</button>
-        {Object.entries(caseLabels).map(([k, v]) => (
-          <button key={k} className={`chip ${filter === k ? "on" : ""}`} onClick={() => setFilter(k)}>{v}</button>
+        {caseTypeOptions.map((o) => (
+          <button key={o.value} className={`chip ${filter === o.value ? "on" : ""}`} onClick={() => setFilter(o.value)}>{o.label}</button>
         ))}
       </div>
 
@@ -194,7 +203,7 @@ export default function Authorities() {
               return (
                 <article className="card" key={c.id}>
                   <div className="row" style={{ marginBottom: 6 }}>
-                    <span className="badge">{caseLabels[c.caseType] ?? c.caseType}</span>
+                    <span className="badge">{caseTypeLabel(c.caseType)}</span>
                     <span className={`badge ${statusTone[c.status] ?? ""}`}>{statusLabelByValue.get(c.status) ?? c.status}</span>
                     <div className="spacer" />
                     {days !== null && (

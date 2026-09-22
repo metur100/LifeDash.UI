@@ -6,6 +6,7 @@ import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead } from "../components/Ui";
 import { countdown, daysUntil, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { useCustomOptions } from "../lib/useCustomOptions";
 
 const categories = ["family", "authority", "finance", "tax", "home", "travel", "insurance", "other"];
 const categoryLabels: Record<string, string> = {
@@ -78,6 +79,12 @@ export default function Documents() {
   const driveToken = useRef<string | null>(null);
   const driveTokenExpiresAt = useRef<number>(0);
   const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
+  const customCategories = useCustomOptions("document-category");
+  const categoryOptions = [
+    ...categories.map((c) => ({ value: c, label: categoryLabels[c] })),
+    ...customCategories.options,
+  ];
+  const categoryLabel = (c: string) => categoryLabels[c] ?? categoryOptions.find((o) => o.value === c)?.label ?? c;
 
   function persistDrivePath(path: Array<{ id: string; name: string }>) {
     localStorage.setItem(DRIVE_PATH_KEY, JSON.stringify(path));
@@ -276,7 +283,8 @@ export default function Documents() {
           key: "category",
           label: "Kategorie",
           type: "select",
-          options: categories.map((c) => ({ value: c, label: categoryLabels[c] })),
+          options: categoryOptions,
+          allowCustomOption: { onAdd: (label) => customCategories.add(label, categoryOptions) },
         },
       ],
       initial: {
@@ -325,7 +333,8 @@ export default function Documents() {
             key: "category",
             label: "Kategorie",
             type: "select",
-            options: categories.map((c) => ({ value: c, label: categoryLabels[c] })),
+            options: categoryOptions,
+            allowCustomOption: { onAdd: (label) => customCategories.add(label, categoryOptions) },
           },
         ],
         initial: {
@@ -525,7 +534,10 @@ export default function Documents() {
       submitText: "Anlegen",
       fields: [
         { key: "title", label: "Titel" },
-        { key: "category", label: "Kategorie", type: "select", options: categories.map((c) => ({ value: c, label: categoryLabels[c] })) },
+        {
+          key: "category", label: "Kategorie", type: "select", options: categoryOptions,
+          allowCustomOption: { onAdd: (label) => customCategories.add(label, categoryOptions) },
+        },
         { key: "documentType", label: "Art" },
         { key: "expiresOn", label: "Läuft ab am", type: "date" },
         { key: "reminderDays", label: "Erinnerung (Tage vorher)", type: "number" },
@@ -582,7 +594,10 @@ export default function Documents() {
       title: "Dokument bearbeiten",
       fields: [
         { key: "title", label: "Titel" },
-        { key: "category", label: "Kategorie", type: "select", options: categories.map((c) => ({ value: c, label: categoryLabels[c] })) },
+        {
+          key: "category", label: "Kategorie", type: "select", options: categoryOptions,
+          allowCustomOption: { onAdd: (label) => customCategories.add(label, categoryOptions) },
+        },
         { key: "documentType", label: "Art" },
         { key: "expiresOn", label: "Läuft ab am", type: "date" },
         { key: "reminderDays", label: "Erinnerung (Tage vorher)", type: "number" },
@@ -846,9 +861,9 @@ export default function Documents() {
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div className="filters" style={{ marginBottom: 0 }}>
           <button className={`chip ${filter === "all" ? "on" : ""}`} onClick={() => setFilter("all")}>Alle</button>
-          {categories.map((c) => (
-            <button key={c} className={`chip ${filter === c ? "on" : ""}`} onClick={() => setFilter(c)}>
-              {categoryLabels[c]}
+          {categoryOptions.map((c) => (
+            <button key={c.value} className={`chip ${filter === c.value ? "on" : ""}`} onClick={() => setFilter(c.value)}>
+              {c.label}
             </button>
           ))}
         </div>
@@ -883,7 +898,7 @@ export default function Documents() {
                       <strong title={d.title}>{d.title}</strong>
                       {d.documentType && <div className="alert-msg">{d.documentType}</div>}
                       <div className="doc-card-badges">
-                        <span className="badge">{categoryLabels[d.category] ?? d.category}</span>
+                        <span className="badge">{categoryLabel(d.category)}</span>
                         {d.expiresOn
                           ? <span className={`badge ${days !== null && days < 0 ? "red" : days !== null && days <= 60 ? "amber" : "green"}`}>
                               {countdown(days)}
@@ -920,7 +935,7 @@ export default function Documents() {
                   return (
                     <tr key={d.id}>
                       <td><strong>{d.title}</strong>{d.documentType && <div className="alert-msg">{d.documentType}</div>}</td>
-                      <td><span className="badge">{categoryLabels[d.category] ?? d.category}</span></td>
+                      <td><span className="badge">{categoryLabel(d.category)}</span></td>
                       <td>
                         {d.expiresOn
                           ? <span className={`badge ${days !== null && days < 0 ? "red" : days !== null && days <= 60 ? "amber" : "green"}`}>
@@ -962,7 +977,7 @@ export default function Documents() {
                   <div key={d.id} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{d.title}</strong>
-                      <span className="badge">{categoryLabels[d.category] ?? d.category}</span>
+                      <span className="badge">{categoryLabel(d.category)}</span>
                     </div>
                     {d.documentType && <div className="alert-msg">{d.documentType}</div>}
                     <div className="mobile-card-grid">

@@ -6,6 +6,8 @@ import { CostBreakdownDonut, CostHistoryChart, IncomeCostChart } from "../compon
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { countdown, daysUntil, euro, localDateIso, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { useCustomOptions } from "../lib/useCustomOptions";
+import type { Option } from "../lib/categories";
 
 const monthly = (amount: number, cadence: string) => {
   if (cadence === "yearly") return amount / 12;
@@ -51,11 +53,11 @@ const COST_CATEGORY_OPTIONS = [
   { value: "sonstiges", label: "Sonstiges" },
 ];
 
-function categoryOptions(current?: string | null) {
+function categoryOptions(current: string | null | undefined, custom: Option[]): Option[] {
+  const base = [...COST_CATEGORY_OPTIONS, ...custom];
   const value = String(current ?? "").trim();
-  if (!value) return COST_CATEGORY_OPTIONS;
-  if (COST_CATEGORY_OPTIONS.some((x) => x.value === value)) return COST_CATEGORY_OPTIONS;
-  return [{ value, label: value }, ...COST_CATEGORY_OPTIONS];
+  if (!value || base.some((x) => x.value === value)) return base;
+  return [{ value, label: value }, ...base];
 }
 
 type CostLine = {
@@ -291,6 +293,7 @@ export default function Finance() {
   const costs = useAsync<FixedCost[]>(() => api.get("/api/fixed-costs"), []);
   const payments = useAsync<Payment[]>(() => api.get("/api/payments"), []);
   const dialog = useDialog();
+  const customCostCategories = useCustomOptions("fixed-cost-category");
 
   const [error, setError] = useState<string | null>(null);
 
@@ -780,7 +783,11 @@ export default function Finance() {
           type: "date",
           visibleWhen: (draft) => String(draft.kind ?? "fixed") === "fixed",
         },
-        { key: "category", label: "Kategorie", type: "select", options: categoryOptions(c.category) },
+        {
+          key: "category", label: "Kategorie", type: "select",
+          options: categoryOptions(c.category, customCostCategories.options),
+          allowCustomOption: { onAdd: (label) => customCostCategories.add(label, categoryOptions(c.category, customCostCategories.options)) },
+        },
       ],
       initial: {
         kind: kindInitial,
@@ -870,7 +877,11 @@ export default function Finance() {
           type: "date",
           visibleWhen: (draft) => String(draft.kind ?? "") === "fixed",
         },
-        { key: "category", label: "Kategorie", type: "select", options: categoryOptions("sonstiges") },
+        {
+          key: "category", label: "Kategorie", type: "select",
+          options: categoryOptions("sonstiges", customCostCategories.options),
+          allowCustomOption: { onAdd: (label) => customCostCategories.add(label, categoryOptions("sonstiges", customCostCategories.options)) },
+        },
       ],
       initial: {
         kind: "variable",

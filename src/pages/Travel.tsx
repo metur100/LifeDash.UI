@@ -8,6 +8,7 @@ import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import TripsTimeline from "../components/TripsTimeline";
 import { dateTime, daysUntil, euro, shortDate, tripPhase } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { useCustomOptions } from "../lib/useCustomOptions";
 
 function toLocalDateTimeInput(iso?: string | null): string {
   if (!iso) return "";
@@ -214,6 +215,10 @@ export default function Travel() {
   const navigate = useNavigate();
   const trips = useAsync<Trip[]>(() => api.get("/api/trips"), []);
   const dialog = useDialog();
+  const customBookingKinds = useCustomOptions("booking-kind");
+  const bookingKindOptions = [...BOOKING_KIND_OPTIONS, ...customBookingKinds.options];
+  const bookingKindLabel = (kind: string) =>
+    BOOKING_KIND_LABEL[kind] ?? bookingKindOptions.find((o) => o.value === kind)?.label ?? kind;
   const [error, setError] = useState<string | null>(null);
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
   const [tripSearch, setTripSearch] = useState("");
@@ -252,7 +257,6 @@ export default function Travel() {
         { key: "destination", label: "Ziel" },
         { key: "startsOn", label: "Start", type: "date" },
         { key: "endsOn", label: "Ende", type: "date" },
-        { key: "budget", label: "Budget", type: "number" },
       ],
       initial: {
         title: "",
@@ -260,7 +264,6 @@ export default function Travel() {
         destination: "",
         startsOn: "",
         endsOn: "",
-        budget: "",
       },
     });
     if (!values) return;
@@ -277,7 +280,7 @@ export default function Travel() {
         startsOn,
         endsOn: String(values.endsOn).trim() || null,
         status: "planned",
-        budget: String(values.budget).trim() ? Number(values.budget) : null,
+        budget: null,
         bookings: [],
         packingItems: [],
       });
@@ -379,6 +382,13 @@ export default function Travel() {
     } catch (e) { setError((e as Error).message); }
   }
 
+  async function setTripStatus(t: Trip, status: string) {
+    try {
+      await api.put(`/api/trips/${t.id}`, { ...t, status });
+      trips.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
   async function removeTrip(id: number) {
     const ok = await dialog.confirm({ title: "Reise löschen", message: "Reise wirklich löschen?", confirmText: "Löschen", danger: true });
     if (!ok) return;
@@ -404,7 +414,8 @@ export default function Travel() {
           key: "kind",
           label: "Art",
           type: "select",
-          options: BOOKING_KIND_OPTIONS,
+          options: bookingKindOptions,
+          allowCustomOption: { onAdd: (label) => customBookingKinds.add(label, bookingKindOptions) },
         },
         {
           key: "direction",
@@ -461,7 +472,8 @@ export default function Travel() {
           key: "kind",
           label: "Art",
           type: "select",
-          options: BOOKING_KIND_OPTIONS,
+          options: bookingKindOptions,
+          allowCustomOption: { onAdd: (label) => customBookingKinds.add(label, bookingKindOptions) },
         },
         {
           key: "direction",
@@ -602,6 +614,17 @@ export default function Travel() {
             <i className="fa-solid fa-pen-to-square" aria-hidden />
             <span className="sr-only">Reise bearbeiten</span>
           </button>{" "}
+          {trip.status === "done" ? (
+            <button className="btn ghost icon-only" aria-label="Reise wieder öffnen" title="Reise wieder öffnen" onClick={() => setTripStatus(trip, "planned")}>
+              <i className="fa-solid fa-rotate-left" aria-hidden />
+              <span className="sr-only">Reise wieder öffnen</span>
+            </button>
+          ) : (
+            <button className="btn ghost icon-only" aria-label="Reise abschließen" title="Reise abschließen" onClick={() => setTripStatus(trip, "done")}>
+              <i className="fa-solid fa-check" aria-hidden />
+              <span className="sr-only">Reise abschließen</span>
+            </button>
+          )}{" "}
           <button className="btn danger icon-only" aria-label="Reise löschen" title="Reise löschen" onClick={() => removeTrip(trip.id)}>
             <i className="fa-solid fa-trash" aria-hidden />
             <span className="sr-only">Reise löschen</span>
@@ -614,8 +637,8 @@ export default function Travel() {
         <Stat label="Gepackt" value={`${packed}/${trip.packingItems.length}`}
               note={packed === trip.packingItems.length ? "vollständig" : "noch offen"} />
         <Stat label="Gebucht" value={euro(spend)} note={`${trip.bookings.length} Buchungen`} />
-        {trip.budget && <Stat label="Budget" value={euro(trip.budget)}
-              tone={spend > trip.budget ? "neg" : "pos"} note={`${euro(trip.budget - spend)} übrig`} />}
+        <Stat label="Status" value={TRIP_STATUS_LABEL[trip.status] ?? trip.status}
+              tone={trip.status === "done" ? "pos" : undefined} />
       </div>
 
         {trip.destination && googleMapsApiKey && <DestinationMap startPlace={trip.startPlace} destination={trip.destination} apiKey={googleMapsApiKey} />}
@@ -650,7 +673,7 @@ export default function Travel() {
                           <td>
                             <strong>{b.title}</strong>
                             <div className="alert-msg">
-                              <span className="badge">{BOOKING_KIND_LABEL[b.kind] ?? b.kind}</span>{" "}
+                              <span className="badge">{bookingKindLabel(b.kind)}</span>{" "}
                               {b.direction && <><span className="badge">{b.direction === "outbound" ? "Hinreise" : "Rückreise"}</span>{" "}</>}
                               {b.referenceNo ? `Nr. ${b.referenceNo} · ` : ""}{dateTime(b.startsAt)}
                             </div>

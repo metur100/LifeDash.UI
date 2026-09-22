@@ -44,9 +44,14 @@ export interface DashboardResponse {
 
 export interface FamilyMember {
   id: number; userId: number; fullName: string; relation?: string | null;
+  relatedToFamilyMemberId?: number | null; relationType?: string | null;
   birthDate?: string | null; nationality?: string | null;
   schoolName?: string | null; schoolGrade?: string | null;
   schoolNote?: string | null; jmbg?: string | null; notes?: string | null;
+}
+
+export interface CategoryOption {
+  id: number; userId: number; listKey: string; value: string; label: string;
 }
 
 export interface Doc {

@@ -2,10 +2,11 @@ import { useState } from "react";
 import { api } from "../api/client";
 import type { FamilyMember } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { AgeDistributionChart, FamilyTree, ageFromBirthDate } from "../components/FamilyCharts";
+import { AgeDistributionChart, FamilyTree, RELATION_TYPE_OPTIONS, ageFromBirthDate } from "../components/FamilyCharts";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { useCustomOptions } from "../lib/useCustomOptions";
 
 type PersonMeta = {
   heightCm: string;
@@ -149,6 +150,17 @@ export default function Family() {
   const [detailsMember, setDetailsMember] = useState<FamilyMember | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [closeDetailsOnBackdropClick, setCloseDetailsOnBackdropClick] = useState(false);
+  const customRoles = useCustomOptions("family-relation-label");
+  const roleOptions = [...PERSON_ROLE_OPTIONS, ...customRoles.options];
+
+  function relatedToOptions(excludeId?: number) {
+    return [
+      { value: "", label: "— keine Verknüpfung —" },
+      ...(members.data ?? [])
+        .filter((m) => m.id !== excludeId)
+        .map((m) => ({ value: String(m.id), label: m.fullName })),
+    ];
+  }
 
   async function addMember() {
     const values = await dialog.form({
@@ -157,7 +169,12 @@ export default function Family() {
       fields: [
         { key: "sec-basic", label: "Basis", type: "section" },
         { key: "fullName", label: "Name" },
-        { key: "relation", label: "Rolle", type: "select", options: PERSON_ROLE_OPTIONS },
+        {
+          key: "relation", label: "Rolle", type: "select", options: roleOptions,
+          allowCustomOption: { onAdd: (label) => customRoles.add(label, roleOptions) },
+        },
+        { key: "relatedToFamilyMemberId", label: "Bezug zu", type: "select", options: relatedToOptions() },
+        { key: "relationType", label: "Beziehungsart", type: "select", options: RELATION_TYPE_OPTIONS },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
         { key: "secondNationality", label: "Zweite Staatsangehörigkeit" },
@@ -189,6 +206,8 @@ export default function Family() {
       initial: {
         fullName: "",
         relation: "",
+        relatedToFamilyMemberId: "",
+        relationType: "",
         birthDate: "",
         nationality: "",
         secondNationality: "",
@@ -246,6 +265,8 @@ export default function Family() {
       await api.post("/api/family-members", {
         fullName: String(values.fullName).trim(),
         relation: String(values.relation).trim() || null,
+        relatedToFamilyMemberId: String(values.relatedToFamilyMemberId ?? "").trim() ? Number(values.relatedToFamilyMemberId) : null,
+        relationType: String(values.relationType ?? "").trim() || null,
         birthDate: String(values.birthDate).trim() || null,
         nationality: String(values.nationality).trim() || null,
         jmbg: String(values.jmbg ?? "").trim() || null,
@@ -262,7 +283,12 @@ export default function Family() {
       fields: [
         { key: "sec-basic", label: "Basis", type: "section" },
         { key: "fullName", label: "Name" },
-        { key: "relation", label: "Rolle", type: "select", options: PERSON_ROLE_OPTIONS },
+        {
+          key: "relation", label: "Rolle", type: "select", options: roleOptions,
+          allowCustomOption: { onAdd: (label) => customRoles.add(label, roleOptions) },
+        },
+        { key: "relatedToFamilyMemberId", label: "Bezug zu", type: "select", options: relatedToOptions(m.id) },
+        { key: "relationType", label: "Beziehungsart", type: "select", options: RELATION_TYPE_OPTIONS },
         { key: "birthDate", label: "Geburtstag", type: "date" },
         { key: "nationality", label: "Staatsangehörigkeit" },
         { key: "secondNationality", label: "Zweite Staatsangehörigkeit" },
@@ -294,6 +320,8 @@ export default function Family() {
       initial: {
         fullName: m.fullName,
         relation: m.relation ?? "",
+        relatedToFamilyMemberId: m.relatedToFamilyMemberId != null ? String(m.relatedToFamilyMemberId) : "",
+        relationType: m.relationType ?? "",
         birthDate: m.birthDate ?? "",
         nationality: m.nationality ?? "",
         secondNationality: parsed.meta.secondNationality,
@@ -351,6 +379,8 @@ export default function Family() {
         ...m,
         fullName: String(values.fullName).trim(),
         relation: String(values.relation).trim() || null,
+        relatedToFamilyMemberId: String(values.relatedToFamilyMemberId ?? "").trim() ? Number(values.relatedToFamilyMemberId) : null,
+        relationType: String(values.relationType ?? "").trim() || null,
         birthDate: String(values.birthDate).trim() || null,
         nationality: String(values.nationality).trim() || null,
         jmbg: String(values.jmbg ?? "").trim() || null,
@@ -401,10 +431,8 @@ export default function Family() {
         lede="Personen, Familienstruktur und Altersverteilung deiner Familie." />
       <ErrorBar message={error ?? members.error} />
 
-      <div className="chart-row">
-        <FamilyTree members={members.data ?? []} />
-        <AgeDistributionChart members={members.data ?? []} />
-      </div>
+      <FamilyTree members={members.data ?? []} />
+      <AgeDistributionChart members={members.data ?? []} />
 
       <div className="stats">
         <Stat label="Personen" value={String((members.data ?? []).length)} />

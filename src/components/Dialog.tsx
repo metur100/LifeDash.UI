@@ -3,12 +3,18 @@ import type { ReactNode } from "react";
 
 type Option = { value: string; label: string };
 
+const ADD_OPTION_VALUE = "__add_new_option__";
+
 export type DialogField = {
   key: string;
   label: string;
   type?: "text" | "number" | "date" | "datetime-local" | "select" | "multiselect" | "section";
   options?: Option[];
   visibleWhen?: (draft: Record<string, unknown>) => boolean;
+  // When set, the select shows a "+ Neue Kategorie hinzufügen" entry that switches the field into
+  // an inline add-mode instead of committing a draft value; confirming calls onAdd and selects the
+  // returned option.
+  allowCustomOption?: { onAdd: (label: string) => Promise<Option> };
 };
 
 type ConfirmOptions = {
@@ -55,12 +61,19 @@ const DialogContext = createContext<DialogApi | null>(null);
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DialogState>(null);
   const [closeOnBackdropClick, setCloseOnBackdropClick] = useState(false);
+  const [addingFieldKey, setAddingFieldKey] = useState<string | null>(null);
+  const [addingFieldText, setAddingFieldText] = useState("");
+  const [addingFieldBusy, setAddingFieldBusy] = useState(false);
+  const [extraOptionsByKey, setExtraOptionsByKey] = useState<Record<string, Option[]>>({});
 
   const api = useMemo<DialogApi>(() => ({
     confirm: (opts) => new Promise<boolean>((resolve) => {
       setState({ kind: "confirm", resolve, ...opts });
     }),
     form: <T extends Record<string, unknown>>(opts: FormOptions<T>) => new Promise<T | null>((resolve) => {
+      setAddingFieldKey(null);
+      setAddingFieldText("");
+      setExtraOptionsByKey({});
       setState({
         kind: "form",
         title: opts.title,
@@ -78,6 +91,22 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     if (state?.kind !== "confirm") return;
     state.resolve(ok);
     setState(null);
+  }
+
+  async function confirmAddOption(field: DialogField) {
+    if (!field.allowCustomOption || !addingFieldText.trim()) return;
+    setAddingFieldBusy(true);
+    try {
+      const option = await field.allowCustomOption.onAdd(addingFieldText.trim());
+      setExtraOptionsByKey((prev) => ({ ...prev, [field.key]: [...(prev[field.key] ?? []), option] }));
+      setState((prev) => prev && prev.kind === "form"
+        ? { ...prev, draft: { ...prev.draft, [field.key]: option.value } }
+        : prev);
+      setAddingFieldKey(null);
+      setAddingFieldText("");
+    } finally {
+      setAddingFieldBusy(false);
+    }
   }
 
   function closeForm(value: Record<string, unknown> | null) {
@@ -155,6 +184,54 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                           ))}
                         </div>
                       </div>
+                    );
+                  }
+
+                  if (f.type === "select" && f.allowCustomOption) {
+                    const mergedOptions = [...(f.options ?? []), ...(extraOptionsByKey[f.key] ?? [])];
+                    return (
+                      <label className="field" key={f.key}>
+                        {f.label}
+                        <select
+                          value={String(state.draft[f.key] ?? "")}
+                          onChange={(e) => {
+                            if (e.target.value === ADD_OPTION_VALUE) {
+                              setAddingFieldKey(f.key);
+                              setAddingFieldText("");
+                              return;
+                            }
+                            setState((prev) => prev && prev.kind === "form"
+                              ? { ...prev, draft: { ...prev.draft, [f.key]: e.target.value } }
+                              : prev);
+                          }}
+                        >
+                          {mergedOptions.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                          <option value={ADD_OPTION_VALUE}>+ Neue Kategorie hinzufügen…</option>
+                        </select>
+                        {addingFieldKey === f.key && (
+                          <div className="dlg-add-option">
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Name der neuen Kategorie"
+                              value={addingFieldText}
+                              onChange={(e) => setAddingFieldText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); void confirmAddOption(f); }
+                                if (e.key === "Escape") { e.preventDefault(); setAddingFieldKey(null); }
+                              }}
+                            />
+                            <button type="button" className="btn small" disabled={addingFieldBusy || !addingFieldText.trim()} onClick={() => void confirmAddOption(f)}>
+                              Hinzufügen
+                            </button>
+                            <button type="button" className="btn ghost small" onClick={() => setAddingFieldKey(null)}>
+                              Abbrechen
+                            </button>
+                          </div>
+                        )}
+                      </label>
                     );
                   }
 

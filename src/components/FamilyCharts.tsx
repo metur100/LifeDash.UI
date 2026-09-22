@@ -8,10 +8,10 @@ import { Section } from "./Ui";
 
 const WEEK_DAYS = 7;
 
-function bucketLabel(index: number, weekBuckets: number, todayIso: string): string {
-  if (index === weekBuckets) return `${weekBuckets * WEEK_DAYS}+ Tage`;
+function bucketLabel(index: number, bucketCount: number, bucketDays: number, todayIso: string): string {
+  if (index === bucketCount) return `${bucketCount * bucketDays}+ Tage`;
   const start = new Date(`${todayIso}T00:00:00`);
-  start.setDate(start.getDate() + index * WEEK_DAYS);
+  start.setDate(start.getDate() + index * bucketDays);
   return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(start);
 }
 
@@ -57,27 +57,29 @@ export function AppointmentCategoryDonut({ categories }: { categories: Array<[st
   );
 }
 
-export function AppointmentLoadChart({ appointments, horizonDays }: { appointments: Appointment[]; horizonDays: number }) {
+export function AppointmentLoadChart({ appointments, horizonDays, bucketDays = WEEK_DAYS, title = "Terminlast · nächste Wochen" }: {
+  appointments: Appointment[]; horizonDays: number; bucketDays?: number; title?: string;
+}) {
   const palette = useChartPalette();
-  const weekBuckets = Math.ceil(horizonDays / WEEK_DAYS);
+  const bucketCount = Math.ceil(horizonDays / bucketDays);
 
   const buckets = useMemo(() => {
     const todayIso = today();
-    const counts = new Array(weekBuckets + 1).fill(0);
+    const counts = new Array(bucketCount + 1).fill(0);
     for (const a of appointments) {
       if (a.isDone) continue;
       const days = daysUntil(a.startsAt.slice(0, 10));
       if (days === null || days < 0 || days > horizonDays) continue;
-      const idx = Math.min(weekBuckets, Math.floor(days / WEEK_DAYS));
+      const idx = Math.min(bucketCount, Math.floor(days / bucketDays));
       counts[idx] += 1;
     }
-    return counts.map((count, i) => ({ label: bucketLabel(i, weekBuckets, todayIso), count }));
-  }, [appointments, horizonDays, weekBuckets]);
+    return counts.map((count, i) => ({ label: bucketLabel(i, bucketCount, bucketDays, todayIso), count }));
+  }, [appointments, horizonDays, bucketDays, bucketCount]);
 
   if (buckets.every((b) => b.count === 0)) return null;
 
   return (
-    <Section title="Terminlast · nächste Wochen">
+    <Section title={title}>
       <div className="card">
         <div className="chart-box">
           <ResponsiveContainer>
@@ -169,9 +171,88 @@ export function ageFromBirthDate(iso?: string | null): number | null {
   return age >= 0 ? age : null;
 }
 
-const TREE_TOP = new Set(["mutter", "vater"]);
-const TREE_MIDDLE = new Set(["ich", "ehepartner", "schwester", "bruder"]);
-const TREE_BOTTOM = new Set(["sohn", "tochter"]);
+// The structural vocabulary for RelationType: what a member is *of* the member at
+// RelatedToFamilyMemberId. Generation is computed relative to that anchor, so e.g. a father-in-law
+// is RelationType="parent" of RelatedTo=<your spouse> - no separate "in-law" types needed.
+export const RELATION_TYPE_OPTIONS = [
+  { value: "", label: "— keine Verknüpfung —" },
+  { value: "parent", label: "Elternteil" },
+  { value: "grandparent", label: "Großelternteil" },
+  { value: "child", label: "Kind" },
+  { value: "grandchild", label: "Enkelkind" },
+  { value: "sibling", label: "Geschwister" },
+  { value: "spouse", label: "Partner/Ehepartner" },
+  { value: "aunt-uncle", label: "Onkel/Tante" },
+  { value: "niece-nephew", label: "Nichte/Neffe" },
+  { value: "cousin", label: "Cousin/Cousine" },
+  { value: "other", label: "Sonstige (gleiche Ebene)" },
+];
+
+const RELATION_TYPE_DELTA: Record<string, number> = {
+  parent: -1, grandparent: -2, child: 1, grandchild: 2, sibling: 0,
+  spouse: 0, "aunt-uncle": -1, "niece-nephew": 1, cousin: 0, other: 0,
+};
+
+// Backward-compat: members created before the RelatedTo/RelationType link existed only have a
+// free-text Relation label. Recognize the common ones so existing data still groups sensibly
+// until it's re-linked - anything unrecognized (a brand new custom relation label, "Oma" was never
+// in the old 3-tier set either) just falls back to the same generation as "Ich".
+const LEGACY_RELATION_GENERATION: Array<{ match: RegExp; generation: number }> = [
+  { match: /^(oma|opa|großmutter|grossmutter|großvater|grossvater)/, generation: -2 },
+  { match: /^(mutter|vater|schwiegermutter|schwiegervater)/, generation: -1 },
+  { match: /^(ich|ehepartner|partner|bruder|schwester)/, generation: 0 },
+  { match: /^(sohn|tochter|schwiegersohn|schwiegertochter)/, generation: 1 },
+  { match: /^enkel/, generation: 2 },
+];
+
+function legacyGeneration(relation?: string | null): number | null {
+  const key = (relation ?? "").trim().toLowerCase();
+  if (!key) return null;
+  return LEGACY_RELATION_GENERATION.find((r) => r.match.test(key))?.generation ?? null;
+}
+
+// gen(x) = gen(RelatedTo(x)) + delta(RelationType(x)), root/unlinked = 0 - so depth (in-laws,
+// grandchildren via a sibling, ...) is unlimited without new code per tier.
+function computeGenerations(members: FamilyMember[]): Map<number, number> {
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const resolved = new Map<number, number>();
+
+  function resolve(id: number, seen: Set<number>): number {
+    const cached = resolved.get(id);
+    if (cached !== undefined) return cached;
+    if (seen.has(id)) return 0; // cyclic link guard
+
+    const member = byId.get(id);
+    if (!member) return 0;
+    seen.add(id);
+
+    let generation: number;
+    if (member.relatedToFamilyMemberId != null && byId.has(member.relatedToFamilyMemberId)) {
+      const delta = RELATION_TYPE_DELTA[member.relationType ?? ""] ?? 0;
+      generation = resolve(member.relatedToFamilyMemberId, seen) + delta;
+    } else {
+      generation = legacyGeneration(member.relation) ?? 0;
+    }
+
+    resolved.set(id, generation);
+    return generation;
+  }
+
+  for (const m of members) resolve(m.id, new Set());
+  return resolved;
+}
+
+const GENERATION_LABELS: Record<number, string> = {
+  [-2]: "Großeltern",
+  [-1]: "Eltern & Schwiegereltern",
+  [0]: "Meine Generation",
+  [1]: "Kinder & Schwiegerkinder",
+  [2]: "Enkelkinder",
+};
+
+function generationLabel(generation: number): string {
+  return GENERATION_LABELS[generation] ?? `Generation ${generation > 0 ? "+" : ""}${generation}`;
+}
 
 function TreeNode({ member }: { member: FamilyMember }) {
   const age = ageFromBirthDate(member.birthDate);
@@ -187,29 +268,28 @@ function TreeNode({ member }: { member: FamilyMember }) {
 export function FamilyTree({ members }: { members: FamilyMember[] }) {
   if (members.length === 0) return null;
 
-  const top: FamilyMember[] = [];
-  const middle: FamilyMember[] = [];
-  const bottom: FamilyMember[] = [];
-  const other: FamilyMember[] = [];
-
+  const generations = computeGenerations(members);
+  const groups = new Map<number, FamilyMember[]>();
   for (const m of members) {
-    const key = (m.relation ?? "").trim().toLowerCase();
-    if (TREE_TOP.has(key)) top.push(m);
-    else if (TREE_MIDDLE.has(key)) middle.push(m);
-    else if (TREE_BOTTOM.has(key)) bottom.push(m);
-    else other.push(m);
+    const gen = generations.get(m.id) ?? 0;
+    const list = groups.get(gen) ?? [];
+    list.push(m);
+    groups.set(gen, list);
   }
+  const sortedGenerations = Array.from(groups.keys()).sort((a, b) => a - b);
 
   return (
     <Section title="Familienstruktur">
       <div className="card">
         <div className="family-tree">
-          {top.length > 0 && <div className="family-tree-row">{top.map((m) => <TreeNode key={m.id} member={m} />)}</div>}
-          {top.length > 0 && middle.length > 0 && <div className="family-tree-connector" />}
-          {middle.length > 0 && <div className="family-tree-row">{middle.map((m) => <TreeNode key={m.id} member={m} />)}</div>}
-          {middle.length > 0 && bottom.length > 0 && <div className="family-tree-connector" />}
-          {bottom.length > 0 && <div className="family-tree-row">{bottom.map((m) => <TreeNode key={m.id} member={m} />)}</div>}
-          {other.length > 0 && <div className="family-tree-row family-tree-row-other">{other.map((m) => <TreeNode key={m.id} member={m} />)}</div>}
+          {sortedGenerations.map((gen) => (
+            <div className="family-tree-group" key={gen}>
+              <div className="family-tree-group-title">{generationLabel(gen)}</div>
+              <div className="family-tree-row">
+                {groups.get(gen)!.map((m) => <TreeNode key={m.id} member={m} />)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </Section>
@@ -221,7 +301,7 @@ export function AgeDistributionChart({ members }: { members: FamilyMember[] }) {
 
   const data = useMemo(() => {
     return members
-      .map((m) => ({ name: m.fullName.split(" ")[0] || m.fullName, age: ageFromBirthDate(m.birthDate) }))
+      .map((m) => ({ name: m.fullName, age: ageFromBirthDate(m.birthDate) }))
       .filter((x): x is { name: string; age: number } => x.age !== null)
       .sort((a, b) => a.age - b.age);
   }, [members]);
@@ -231,11 +311,12 @@ export function AgeDistributionChart({ members }: { members: FamilyMember[] }) {
   return (
     <Section title="Altersverteilung">
       <div className="card">
-        <div className="chart-box">
+        <div className="chart-box chart-box-tall">
           <ResponsiveContainer>
-            <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 48 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={palette.line} vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: palette.textSoft }} axisLine={{ stroke: palette.line }} tickLine={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: palette.textSoft }} axisLine={{ stroke: palette.line }}
+                     tickLine={false} interval={0} angle={-35} textAnchor="end" height={60} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: palette.textSoft }} axisLine={false} tickLine={false} width={28} />
               <Tooltip content={<ChartTooltip formatValue={(v: number) => `${v} Jahre`} />} cursor={{ fill: palette.line, opacity: 0.4 }} />
               <Bar dataKey="age" name="Alter" fill={palette.accent} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false} />

@@ -6,6 +6,8 @@ import { AppointmentCategoryDonut, AppointmentLoadChart, ImportantDatesTimeline 
 import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
 import { countdown, dateTime, daysUntil, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { useCustomOptions } from "../lib/useCustomOptions";
+import type { Option } from "../lib/categories";
 
 const IMPORTANT_META_START = "[important-meta]";
 const IMPORTANT_META_END = "[/important-meta]";
@@ -156,23 +158,19 @@ const IMPORTANT_DATE_CATEGORIES = [
   { value: "other", label: "Sonstiges" },
 ];
 
-const importantDateCategoryLabelByValue = new Map(IMPORTANT_DATE_CATEGORIES.map((x) => [x.value, x.label]));
-
-function importantDateCategoryLabel(category?: string | null): string {
+function importantDateCategoryLabel(category: string | null | undefined, options: Option[] = IMPORTANT_DATE_CATEGORIES): string {
   const key = String(category ?? "").trim().toLowerCase();
-  return importantDateCategoryLabelByValue.get(key) ?? "Sonstiges";
+  return options.find((o) => o.value === key)?.label ?? (key || "Sonstiges");
 }
 
-const categoryLabelByValue = new Map(APPOINTMENT_CATEGORIES.map((x) => [x.value, x.label]));
-
-function categoryLabel(category?: string | null): string {
+function categoryLabel(category: string | null | undefined, options: Option[] = APPOINTMENT_CATEGORIES): string {
   const key = String(category ?? "").trim().toLowerCase();
-  return categoryLabelByValue.get(key) ?? (key || "Termin");
+  return options.find((o) => o.value === key)?.label ?? (key || "Termin");
 }
 
-function normalizeCategory(category?: string | null): string {
+function normalizeCategory(category: string | null | undefined, options: Option[] = APPOINTMENT_CATEGORIES): string {
   const key = String(category ?? "").trim().toLowerCase();
-  return categoryLabelByValue.has(key) ? key : "other";
+  return options.some((o) => o.value === key) ? key : "other";
 }
 
 function nextImportantOccurrence(d: ImportantDate, fromIso = today()): string {
@@ -216,10 +214,10 @@ function attendeeNames(ids: number[], memberNameById: Map<number, string>): stri
   return ids.map((id) => memberNameById.get(id) ?? "Person").join(", ");
 }
 
-function appointmentTooltip(a: Appointment, memberNameById: Map<number, string>): string {
+function appointmentTooltip(a: Appointment, memberNameById: Map<number, string>, categoryOptions: Option[]): string {
   const lines = [
     a.title,
-    `Kategorie: ${categoryLabel(a.category)}`,
+    `Kategorie: ${categoryLabel(a.category, categoryOptions)}`,
     `Zeit: ${dateTime(a.startsAt)}`,
   ];
   if (a.location) lines.push(`Ort: ${a.location}`);
@@ -262,6 +260,11 @@ export default function Termine() {
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [mailScanBusy, setMailScanBusy] = useState(false);
   const [mailScanMessage, setMailScanMessage] = useState<string | null>(null);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const customAppointmentCategories = useCustomOptions("appointment-category");
+  const appointmentCategoryOptions = [...APPOINTMENT_CATEGORIES, ...customAppointmentCategories.options];
+  const customImportantDateCategories = useCustomOptions("important-date-category");
+  const importantDateCategoryOptions = [...IMPORTANT_DATE_CATEGORIES, ...customImportantDateCategories.options];
 
   async function scanAppointmentsMailbox() {
     setError(null);
@@ -313,14 +316,17 @@ export default function Termine() {
         { key: "title", label: "Termin" },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
-        { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
+        {
+          key: "category", label: "Kategorie", type: "select", options: appointmentCategoryOptions,
+          allowCustomOption: { onAdd: (label) => customAppointmentCategories.add(label, appointmentCategoryOptions) },
+        },
         { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
       ],
       initial: {
         title: a.title,
         startsAt: toLocalDateTimeInput(a.startsAt),
         location: a.location ?? "",
-        category: normalizeCategory(a.category),
+        category: normalizeCategory(a.category, appointmentCategoryOptions),
         attendeeIds: a.attendeeIds.join(","),
       },
     });
@@ -331,7 +337,7 @@ export default function Termine() {
         title: String(values.title).trim(),
         startsAt: fromDateTimeInput(values.startsAt) ?? a.startsAt,
         location: String(values.location).trim() || null,
-        category: normalizeCategory(String(values.category)),
+        category: normalizeCategory(String(values.category), appointmentCategoryOptions),
         attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: a.reminderDays,
         isDone: false,
@@ -364,7 +370,10 @@ export default function Termine() {
       title: "Wichtiges Datum bearbeiten",
       fields: [
         { key: "title", label: "Anlass" },
-        { key: "category", label: "Kategorie", type: "select", options: IMPORTANT_DATE_CATEGORIES },
+        {
+          key: "category", label: "Kategorie", type: "select", options: importantDateCategoryOptions,
+          allowCustomOption: { onAdd: (label) => customImportantDateCategories.add(label, importantDateCategoryOptions) },
+        },
         { key: "dateValue", label: "Datum", type: "date" },
         {
           key: "cadence",
@@ -423,7 +432,10 @@ export default function Termine() {
         { key: "title", label: "Termin" },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
-        { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
+        {
+          key: "category", label: "Kategorie", type: "select", options: appointmentCategoryOptions,
+          allowCustomOption: { onAdd: (label) => customAppointmentCategories.add(label, appointmentCategoryOptions) },
+        },
         { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
       ],
       initial: {
@@ -442,7 +454,7 @@ export default function Termine() {
         title: String(values.title).trim(),
         startsAt: fromDateTimeInput(values.startsAt),
         location: String(values.location).trim() || null,
-        category: normalizeCategory(String(values.category)),
+        category: normalizeCategory(String(values.category), appointmentCategoryOptions),
         attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: 3,
         isDone: false,
@@ -464,7 +476,10 @@ export default function Termine() {
         { key: "title", label: "Termin" },
         { key: "startsAt", label: "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
-        { key: "category", label: "Kategorie", type: "select", options: APPOINTMENT_CATEGORIES },
+        {
+          key: "category", label: "Kategorie", type: "select", options: appointmentCategoryOptions,
+          allowCustomOption: { onAdd: (label) => customAppointmentCategories.add(label, appointmentCategoryOptions) },
+        },
         { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
       ],
       initial: {
@@ -485,7 +500,7 @@ export default function Termine() {
         title: String(values.title).trim(),
         startsAt,
         location: String(values.location).trim() || null,
-        category: normalizeCategory(String(values.category)),
+        category: normalizeCategory(String(values.category), appointmentCategoryOptions),
         attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: 3,
         isDone: false,
@@ -500,7 +515,10 @@ export default function Termine() {
       submitText: "Anlegen",
       fields: [
         { key: "title", label: "Anlass" },
-        { key: "category", label: "Kategorie", type: "select", options: IMPORTANT_DATE_CATEGORIES },
+        {
+          key: "category", label: "Kategorie", type: "select", options: importantDateCategoryOptions,
+          allowCustomOption: { onAdd: (label) => customImportantDateCategories.add(label, importantDateCategoryOptions) },
+        },
         { key: "dateValue", label: "Datum", type: "date" },
         { key: "cadence", label: "Wiederholung", type: "select", options: [
           { value: "monthly", label: "monatlich" },
@@ -533,9 +551,16 @@ export default function Termine() {
     } catch (e) { setError((e as Error).message); }
   }
 
-  const upcoming = (appts.data ?? [])
+  const UPCOMING_WINDOW_DAYS = 14;
+  const allUpcoming = (appts.data ?? [])
     .filter((a) => !a.isDone)
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const upcoming = showAllUpcoming
+    ? allUpcoming
+    : allUpcoming.filter((a) => {
+        const days = daysUntil(a.startsAt.slice(0, 10));
+        return days === null || days <= UPCOMING_WINDOW_DAYS;
+      });
   const doneAppointments = (appts.data ?? [])
     .filter((a) => a.isDone)
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
@@ -545,13 +570,13 @@ export default function Termine() {
     const counts = new Map<string, number>();
     for (const a of (appts.data ?? [])) {
       if (a.isDone) continue;
-      const key = normalizeCategory(a.category);
+      const key = normalizeCategory(a.category, appointmentCategoryOptions);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    return APPOINTMENT_CATEGORIES
+    return appointmentCategoryOptions
       .map((c) => [c.label, counts.get(c.value) ?? 0] as [string, number])
       .filter(([, value]) => value > 0);
-  }, [appts.data]);
+  }, [appts.data, appointmentCategoryOptions]);
 
   const importantDateTimelineItems = useMemo(() => {
     return (dates.data ?? [])
@@ -685,7 +710,7 @@ export default function Termine() {
               }
               for (const a of items) {
                 const when = dateTime(a.startsAt);
-                const cat = categoryLabel(a.category);
+                const cat = categoryLabel(a.category, appointmentCategoryOptions);
                 cellTooltipLines.push(`• ${a.title} (${cat}, ${when})`);
               }
               const cellTitle = cellTooltipLines.length > 0
@@ -732,8 +757,8 @@ export default function Termine() {
                   {items.map((a) => (
                     <span
                       key={a.id}
-                      className={`appt appt-cat-${normalizeCategory(a.category)}`}
-                      title={appointmentTooltip(a, memberNameById)}
+                      className={`appt appt-cat-${normalizeCategory(a.category, appointmentCategoryOptions)}`}
+                      title={appointmentTooltip(a, memberNameById, appointmentCategoryOptions)}
                       role="button"
                       tabIndex={0}
                       onClick={(e) => { e.stopPropagation(); void editAppointment(a); }}
@@ -768,10 +793,13 @@ export default function Termine() {
 
       <div className="chart-row">
         <AppointmentCategoryDonut categories={appointmentCategoryData} />
-        <AppointmentLoadChart appointments={appts.data ?? []} horizonDays={91} />
+        <AppointmentLoadChart appointments={appts.data ?? []} horizonDays={14} bucketDays={1} title="Terminlast · nächste 14 Tage" />
       </div>
 
-      <Section title="Termine">
+      <Section title={showAllUpcoming ? "Termine · alle" : "Termine · nächste 14 Tage"}
+        action={<button className={`chip ${showAllUpcoming ? "on" : ""}`} onClick={() => setShowAllUpcoming((v) => !v)}>
+          {showAllUpcoming ? "Nur nächste 14 Tage" : "Alle anzeigen"}
+        </button>}>
         {upcoming.length === 0
           ? <Empty title="Keine offenen Termine." hint="Neue Termine erscheinen hier, sobald du sie anlegst." />
           : <div className="card">
@@ -783,7 +811,7 @@ export default function Termine() {
                       <span className="badge">{countdown(daysUntil(a.startsAt.slice(0, 10)))}</span>
                     </div>
                     <div className="alert-msg">
-                      {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
+                      {categoryLabel(a.category, appointmentCategoryOptions)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
                       {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
                     </div>
                     <div className="action-stack mobile-card-actions">
@@ -845,7 +873,7 @@ export default function Termine() {
                     {(dates.data ?? []).map((d) => (
                       <tr key={d.id}>
                         <td><strong>{d.title}</strong></td>
-                        <td><span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category)}</span></td>
+                        <td><span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category, importantDateCategoryOptions)}</span></td>
                         <td>{shortDate(d.dateValue)}</td>
                         <td>{importantCadenceLabel(d)}</td>
                         <td className="num">{countdown(daysUntil(nextImportantOccurrence(d)))}</td>
@@ -872,7 +900,7 @@ export default function Termine() {
                   <div key={`m-${d.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{d.title}</strong>
-                      <span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category)}</span>
+                      <span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category, importantDateCategoryOptions)}</span>
                     </div>
                     <div className="alert-msg">{shortDate(d.dateValue)} · {importantCadenceLabel(d)}</div>
                     <div className="mobile-card-grid">

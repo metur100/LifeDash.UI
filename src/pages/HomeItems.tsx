@@ -5,6 +5,7 @@ import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
 import { countdown, daysUntil, euro, shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
+import { useCustomOptions } from "../lib/useCustomOptions";
 
 const HOME_ITEM_KIND_LABEL: Record<string, string> = {
   repair: "Reparatur",
@@ -24,6 +25,9 @@ export default function HomeItems() {
   const items = useAsync<HomeItem[]>(() => api.get("/api/home-items"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
+  const customKinds = useCustomOptions("home-item-kind");
+  const kindOptions = [...HOME_ITEM_KIND_OPTIONS, ...customKinds.options];
+  const kindLabel = (kind: string) => HOME_ITEM_KIND_LABEL[kind] ?? kindOptions.find((o) => o.value === kind)?.label ?? kind;
 
   async function addItem() {
     const values = await dialog.form({
@@ -34,7 +38,8 @@ export default function HomeItems() {
           key: "kind",
           label: "Art",
           type: "select",
-          options: HOME_ITEM_KIND_OPTIONS,
+          options: kindOptions,
+          allowCustomOption: { onAdd: (label) => customKinds.add(label, kindOptions) },
         },
         { key: "title", label: "Bezeichnung" },
         { key: "room", label: "Raum" },
@@ -86,7 +91,8 @@ export default function HomeItems() {
           key: "kind",
           label: "Art",
           type: "select",
-          options: HOME_ITEM_KIND_OPTIONS,
+          options: kindOptions,
+          allowCustomOption: { onAdd: (label) => customKinds.add(label, kindOptions) },
         },
         { key: "room", label: "Raum" },
         {
@@ -356,7 +362,7 @@ export default function HomeItems() {
                     {doneItems.map((d) => (
                       <tr key={d.id}>
                         <td><strong>{d.title}</strong><div className="alert-msg">{d.room ?? d.vendor ?? ""}</div></td>
-                        <td>{HOME_ITEM_KIND_LABEL[d.kind] ?? d.kind}</td>
+                        <td>{kindLabel(d.kind)}</td>
                         <td><span className="badge green">{HOME_ITEM_STATUS_LABEL.done}</span></td>
                         <td className="num action-cell">
                           <div className="action-stack">
@@ -383,7 +389,7 @@ export default function HomeItems() {
                       <strong>{d.title}</strong>
                       <span className="badge green">{HOME_ITEM_STATUS_LABEL.done}</span>
                     </div>
-                    <div className="alert-msg">{HOME_ITEM_KIND_LABEL[d.kind] ?? d.kind}{d.room || d.vendor ? ` · ${d.room ?? d.vendor}` : ""}</div>
+                    <div className="alert-msg">{kindLabel(d.kind)}{d.room || d.vendor ? ` · ${d.room ?? d.vendor}` : ""}</div>
                     <div className="action-stack mobile-card-actions">
                       <button className="btn ghost small icon-only" aria-label="Wieder öffnen" title="Wieder öffnen" onClick={() => reopen(d)}>
                         <i className="fa-solid fa-rotate-left" aria-hidden />

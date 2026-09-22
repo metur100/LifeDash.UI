@@ -832,6 +832,17 @@ textarea { min-height: 70px; resize: vertical; }
 
 .multiselect-option input { width: auto; }
 
+.dlg-add-option {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.dlg-add-option input {
+  flex: 1;
+  min-width: 0;
+}
+
 .dlg-section-title {
   grid-column: 1 / -1;
   font-family: var(--mono);
@@ -2940,6 +2951,7 @@ textarea { min-height: 70px; resize: vertical; }
 .chart-row > .section > .card > .chart-box { flex: 1; height: auto; min-height: 220px; }
 .chart-box { width: 100%; height: 220px; }
 .chart-box.small { height: 170px; }
+.chart-box-tall { height: 280px; }
 .chart-title { font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 0 0 4px; }
 .chart-card-inner { display: flex; flex-direction: column; }
 
@@ -2970,16 +2982,26 @@ textarea { min-height: 70px; resize: vertical; }
 .donut-cell-label { font-size: 12px; color: var(--text-soft); }
 .donut-cell-note { font-size: 11px; color: var(--text-soft); }
 
-.family-tree { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.family-tree-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
-.family-tree-row-other { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
-.family-tree-connector { width: 2px; height: 16px; background: var(--line); }
+/* Generation-grouped family structure: each generation is its own bordered card, laid out side
+   by side. Deliberately no connecting lines between cards or members - the grouping itself
+   conveys the structure. */
+.family-tree { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+.family-tree-group {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg-2); min-width: 200px; flex: 1;
+}
+.family-tree-group-title {
+  font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--accent);
+}
+.family-tree-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .family-tree-node {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px;
-  background: var(--bg-2); min-width: 100px; max-width: 160px; text-align: center;
+  background: var(--card); min-width: 100px; max-width: 200px; text-align: center;
 }
-.family-tree-node strong { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 132px; }
+.family-tree-node strong { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 172px; }
 .family-tree-node span { font-size: 11px; color: var(--text-soft); }
 
 .gantt { display: flex; flex-direction: column; gap: 10px; }

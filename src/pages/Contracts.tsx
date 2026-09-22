@@ -209,12 +209,6 @@ export default function Contracts() {
       />
       <ErrorBar message={error ?? contracts.error ?? members.error} />
 
-      <ContractsTimeline subscriptions={contracts.data ?? []} />
-
-      <div className="chart-row">
-        <CostBreakdownDonut categories={costBreakdown} />
-      </div>
-
       <Section title="Verträge" action={<button className="btn icon-only" aria-label="Vertrag hinzufügen" title="Vertrag hinzufügen" onClick={addContract}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Vertrag hinzufügen</span></button>}>
         {rows.length === 0
           ? <Empty title="Noch keine Verträge." hint="Lege Verträge mit Startdatum, Enddatum und Kündigungsfrist an — auch solche ohne Zahlung, z.B. einen Betreuungsvertrag." />
@@ -281,6 +275,12 @@ export default function Contracts() {
               </div>
             </div>}
       </Section>
+
+      <ContractsTimeline subscriptions={contracts.data ?? []} />
+
+      <div className="chart-row">
+        <CostBreakdownDonut categories={costBreakdown} />
+      </div>
     </>
   );
 }
