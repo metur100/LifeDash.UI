@@ -2982,26 +2982,26 @@ textarea { min-height: 70px; resize: vertical; }
 .donut-cell-label { font-size: 12px; color: var(--text-soft); }
 .donut-cell-note { font-size: 11px; color: var(--text-soft); }
 
-/* Generation-grouped family structure: each generation is its own bordered card, laid out side
-   by side. Deliberately no connecting lines between cards or members - the grouping itself
+/* Nested family structure: one bordered box per branch (a person + spouse, paired inline), with
+   descendants nested inside via indentation. Top-level branches (ancestors, siblings, in-laws,
+   ...) sit side by side. Deliberately no connecting lines anywhere - nesting/grouping alone
    conveys the structure. */
-.family-tree { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
-.family-tree-group {
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
-  background: var(--bg-2); min-width: 200px; flex: 1;
+.family-tree { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; }
+.family-branch {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg-2);
 }
-.family-tree-group-title {
-  font-family: var(--mono); font-size: 11px; text-transform: uppercase;
-  letter-spacing: 0.08em; color: var(--accent);
+.family-branch-children {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px;
+  padding-left: 20px;
 }
-.family-tree-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .family-tree-node {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px;
-  background: var(--card); min-width: 100px; max-width: 200px; text-align: center;
+  background: var(--card); min-width: 140px; max-width: 240px; text-align: left;
 }
-.family-tree-node strong { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 172px; }
+.family-tree-node strong { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 212px; }
 .family-tree-node span { font-size: 11px; color: var(--text-soft); }
 
 .gantt { display: flex; flex-direction: column; gap: 10px; }

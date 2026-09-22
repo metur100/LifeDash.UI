@@ -3,7 +3,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
 import type { Appointment, FamilyMember } from "../api/types";
 import { ChartTooltip } from "./charts/ChartTooltip";
 import { useChartPalette } from "../lib/chartTheme";
-import { daysUntil, shortDate, today } from "../lib/format";
+import { daysUntil, today } from "../lib/format";
 import { Section } from "./Ui";
 
 const WEEK_DAYS = 7;
@@ -97,69 +97,6 @@ export function AppointmentLoadChart({ appointments, horizonDays, bucketDays = W
   );
 }
 
-const IMPORTANT_TIMELINE_WINDOW_DAYS = 365;
-const IMPORTANT_CATEGORY_HUE: Record<string, number> = { birthday: 0, wedding: 1, anniversary: 2, other: 3 };
-
-function importantTimelineMonthTicks(): Array<{ offset: number; label: string }> {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const ticks: Array<{ offset: number; label: string }> = [];
-  for (let i = 0; i <= 13; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    if (d <= now) continue;
-    const offset = Math.round((d.getTime() - now.getTime()) / 86_400_000);
-    if (offset > IMPORTANT_TIMELINE_WINDOW_DAYS) break;
-    ticks.push({ offset, label: new Intl.DateTimeFormat("de-DE", { month: "short" }).format(d) });
-  }
-  return ticks;
-}
-
-export type ImportantTimelineItem = { id: number; title: string; category: string; offsetDays: number; iso: string };
-
-export function ImportantDatesTimeline({ items }: { items: ImportantTimelineItem[] }) {
-  const palette = useChartPalette();
-  const rows = [...items].sort((a, b) => a.offsetDays - b.offsetDays);
-  if (rows.length === 0) return null;
-
-  const ticks = importantTimelineMonthTicks();
-
-  return (
-    <Section title="Anlässe im Jahresverlauf">
-      <div className="card">
-        <div className="gantt">
-          {rows.map((item) => {
-            const left = (item.offsetDays / IMPORTANT_TIMELINE_WINDOW_DAYS) * 100;
-            const width = Math.max(1.2, (1 / IMPORTANT_TIMELINE_WINDOW_DAYS) * 100);
-            const color = palette.categorical[(IMPORTANT_CATEGORY_HUE[item.category] ?? 3) % palette.categorical.length];
-            return (
-              <div className="gantt-row" key={item.id}>
-                <div className="gantt-label" title={item.title}>
-                  <strong>{item.title}</strong>
-                  <span>{shortDate(item.iso)}</span>
-                </div>
-                <div className="gantt-track">
-                  <div className="gantt-bar" style={{ left: `${left}%`, width: `${width}%`, background: color }}
-                       title={`${item.title} · ${shortDate(item.iso)}`} />
-                </div>
-              </div>
-            );
-          })}
-          <div className="gantt-axis">
-            <span />
-            <div className="gantt-axis-track">
-              {ticks.map((tick) => (
-                <span key={tick.offset} className="gantt-axis-tick" style={{ left: `${(tick.offset / IMPORTANT_TIMELINE_WINDOW_DAYS) * 100}%` }}>
-                  {tick.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </Section>
-  );
-}
-
 export function ageFromBirthDate(iso?: string | null): number | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -172,8 +109,9 @@ export function ageFromBirthDate(iso?: string | null): number | null {
 }
 
 // The structural vocabulary for RelationType: what a member is *of* the member at
-// RelatedToFamilyMemberId. Generation is computed relative to that anchor, so e.g. a father-in-law
-// is RelationType="parent" of RelatedTo=<your spouse> - no separate "in-law" types needed.
+// RelatedToFamilyMemberId. E.g. a father-in-law is RelationType="parent" of
+// RelatedTo=<your spouse> - no separate "in-law" types needed, since the tree is built by walking
+// these edges outward from whoever is marked IsSelf, not by a fixed relation vocabulary per tier.
 export const RELATION_TYPE_OPTIONS = [
   { value: "", label: "— keine Verknüpfung —" },
   { value: "parent", label: "Elternteil" },
@@ -188,79 +126,144 @@ export const RELATION_TYPE_OPTIONS = [
   { value: "other", label: "Sonstige (gleiche Ebene)" },
 ];
 
-const RELATION_TYPE_DELTA: Record<string, number> = {
-  parent: -1, grandparent: -2, child: 1, grandchild: 2, sibling: 0,
-  spouse: 0, "aunt-uncle": -1, "niece-nephew": 1, cousin: 0, other: 0,
-};
+const RELATION_TYPE_LABEL = new Map(RELATION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
-// Backward-compat: members created before the RelatedTo/RelationType link existed only have a
-// free-text Relation label. Recognize the common ones so existing data still groups sensibly
-// until it's re-linked - anything unrecognized (a brand new custom relation label, "Oma" was never
-// in the old 3-tier set either) just falls back to the same generation as "Ich".
-const LEGACY_RELATION_GENERATION: Array<{ match: RegExp; generation: number }> = [
-  { match: /^(oma|opa|großmutter|grossmutter|großvater|grossvater)/, generation: -2 },
-  { match: /^(mutter|vater|schwiegermutter|schwiegervater)/, generation: -1 },
-  { match: /^(ich|ehepartner|partner|bruder|schwester)/, generation: 0 },
-  { match: /^(sohn|tochter|schwiegersohn|schwiegertochter)/, generation: 1 },
-  { match: /^enkel/, generation: 2 },
-];
+// Every edge normalizes into exactly one of these three buckets, regardless of which of the two
+// linked members' records actually stores it (a "parent" edge on the parent's own record and a
+// "child" edge on the child's record describe the same relationship from opposite ends):
+//   - a "descend" pair (ancestorId, descendantId) - the descendant nests under the ancestor
+//   - a spouse pair - shown paired inline, never nested
+//   - a "lateral" pair - side by side, each gets its own branch when reached from the other
+function classifyEdges(members: FamilyMember[], byId: Map<number, FamilyMember>) {
+  const childrenOf = new Map<number, number[]>();
+  const parentOf = new Map<number, number[]>();
+  const spouseOf = new Map<number, number>();
+  const lateralOf = new Map<number, number[]>();
 
-function legacyGeneration(relation?: string | null): number | null {
-  const key = (relation ?? "").trim().toLowerCase();
-  if (!key) return null;
-  return LEGACY_RELATION_GENERATION.find((r) => r.match.test(key))?.generation ?? null;
-}
+  const addChild = (ancestorId: number, descendantId: number) => {
+    childrenOf.set(ancestorId, [...(childrenOf.get(ancestorId) ?? []), descendantId]);
+    parentOf.set(descendantId, [...(parentOf.get(descendantId) ?? []), ancestorId]);
+  };
+  const addLateral = (a: number, b: number) => {
+    lateralOf.set(a, [...(lateralOf.get(a) ?? []), b]);
+    lateralOf.set(b, [...(lateralOf.get(b) ?? []), a]);
+  };
 
-// gen(x) = gen(RelatedTo(x)) + delta(RelationType(x)), root/unlinked = 0 - so depth (in-laws,
-// grandchildren via a sibling, ...) is unlimited without new code per tier.
-function computeGenerations(members: FamilyMember[]): Map<number, number> {
-  const byId = new Map(members.map((m) => [m.id, m]));
-  const resolved = new Map<number, number>();
+  for (const m of members) {
+    const r = m.relatedToFamilyMemberId;
+    if (r == null || !byId.has(r) || r === m.id) continue;
 
-  function resolve(id: number, seen: Set<number>): number {
-    const cached = resolved.get(id);
-    if (cached !== undefined) return cached;
-    if (seen.has(id)) return 0; // cyclic link guard
-
-    const member = byId.get(id);
-    if (!member) return 0;
-    seen.add(id);
-
-    let generation: number;
-    if (member.relatedToFamilyMemberId != null && byId.has(member.relatedToFamilyMemberId)) {
-      const delta = RELATION_TYPE_DELTA[member.relationType ?? ""] ?? 0;
-      generation = resolve(member.relatedToFamilyMemberId, seen) + delta;
-    } else {
-      generation = legacyGeneration(member.relation) ?? 0;
+    switch (m.relationType) {
+      case "parent": case "grandparent": addChild(m.id, r); break; // m is the ancestor, r descends
+      case "child": case "grandchild": addChild(r, m.id); break; // r is the ancestor, m descends
+      case "spouse": spouseOf.set(m.id, r); spouseOf.set(r, m.id); break;
+      default: addLateral(m.id, r); break; // sibling, aunt-uncle, niece-nephew, cousin, other
     }
-
-    resolved.set(id, generation);
-    return generation;
   }
 
-  for (const m of members) resolve(m.id, new Set());
-  return resolved;
+  return { childrenOf, parentOf, spouseOf, lateralOf };
 }
 
-const GENERATION_LABELS: Record<number, string> = {
-  [-2]: "Großeltern",
-  [-1]: "Eltern & Schwiegereltern",
-  [0]: "Meine Generation",
-  [1]: "Kinder & Schwiegerkinder",
-  [2]: "Enkelkinder",
-};
+// Describes a member relative to whoever anchors them in the tree - e.g. "Kind" when linked
+// straight to the root, or "Kind (von Sestra)" when linked via someone else, so a nephew doesn't
+// read the same as your own child.
+export function describeRelation(member: FamilyMember, byId: Map<number, FamilyMember>, rootId: number | null): string {
+  if (member.id === rootId) return "Ich";
+  if (!member.relatedToFamilyMemberId || !member.relationType) return member.relation || "—";
 
-function generationLabel(generation: number): string {
-  return GENERATION_LABELS[generation] ?? `Generation ${generation > 0 ? "+" : ""}${generation}`;
+  const anchor = byId.get(member.relatedToFamilyMemberId);
+  const typeLabel = RELATION_TYPE_LABEL.get(member.relationType) ?? member.relationType;
+  if (!anchor || anchor.id === rootId) return typeLabel;
+  return `${typeLabel} (von ${anchor.fullName})`;
 }
 
-function TreeNode({ member }: { member: FamilyMember }) {
-  const age = ageFromBirthDate(member.birthDate);
+// Picks the tree's root: the member marked IsSelf, or - until one is set - the most-connected
+// member, so the tree still renders something coherent rather than a flat unconnected list.
+export function pickRootId(members: FamilyMember[]): number | null {
+  const marked = members.find((m) => m.isSelf);
+  if (marked) return marked.id;
+  if (members.length === 0) return null;
+
+  const degree = new Map<number, number>();
+  const bump = (id: number) => degree.set(id, (degree.get(id) ?? 0) + 1);
+  for (const m of members) {
+    if (m.relatedToFamilyMemberId != null) { bump(m.id); bump(m.relatedToFamilyMemberId); }
+  }
+  return members.reduce((best, m) => (degree.get(m.id) ?? 0) > (degree.get(best.id) ?? 0) ? m : best, members[0]).id;
+}
+
+type FamilyBranch = { member: FamilyMember; companion?: FamilyMember; children: FamilyBranch[] };
+
+// Builds the forest of top-level branches rooted at rootId: each branch is one person (+ spouse,
+// paired inline) with their descendants nested inside. Ancestors, siblings and other lateral
+// relations become their *own* top-level branches instead of nesting the root under them, since
+// the root is always the tree's fixed starting point, not necessarily its genealogical top.
+function buildFamilyBranches(members: FamilyMember[], byId: Map<number, FamilyMember>, rootId: number): FamilyBranch[] {
+  const { childrenOf, parentOf, spouseOf, lateralOf } = classifyEdges(members, byId);
+  const visited = new Set<number>();
+
+  function buildNode(id: number): FamilyBranch {
+    visited.add(id);
+    const member = byId.get(id)!;
+
+    const companionId = spouseOf.get(id);
+    const companion = companionId != null && !visited.has(companionId) ? byId.get(companionId) : undefined;
+    if (companion) visited.add(companion.id);
+
+    const kidIds = new Set<number>([
+      ...(childrenOf.get(id) ?? []),
+      ...(companionId != null ? childrenOf.get(companionId) ?? [] : []),
+    ]);
+    const children = Array.from(kidIds).filter((k) => !visited.has(k)).map((k) => buildNode(k));
+
+    return { member, companion, children };
+  }
+
+  const branches: FamilyBranch[] = [];
+  const queue: number[] = [rootId];
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (visited.has(id)) continue;
+
+    const node = buildNode(id);
+    branches.push(node);
+
+    const anchors = [node.member.id, node.companion?.id].filter((x): x is number => x != null);
+    for (const a of anchors) {
+      for (const nb of lateralOf.get(a) ?? []) if (!visited.has(nb)) queue.push(nb);
+      for (const anc of parentOf.get(a) ?? []) if (!visited.has(anc)) queue.push(anc);
+    }
+
+    // Nothing left in the queue but unrelated members remain (no path back to root) - start a new,
+    // disconnected branch for one of them rather than silently dropping them from the tree.
+    if (queue.length === 0) {
+      const stray = members.find((m) => !visited.has(m.id));
+      if (stray) queue.push(stray.id);
+    }
+  }
+
+  return branches;
+}
+
+function BranchNode({ node, rootId, byId }: { node: FamilyBranch; rootId: number | null; byId: Map<number, FamilyMember> }) {
+  const age = ageFromBirthDate(node.member.birthDate);
+  const companionAge = node.companion ? ageFromBirthDate(node.companion.birthDate) : null;
+
   return (
-    <div className="family-tree-node" title={member.fullName}>
-      <strong>{member.fullName}</strong>
-      <span>{member.relation || "—"}</span>
-      <span>{age !== null ? `${age} Jahre` : "—"}</span>
+    <div className="family-branch">
+      <div className="family-tree-node" title={node.companion ? `${node.member.fullName} & ${node.companion.fullName}` : node.member.fullName}>
+        <strong>{node.member.fullName}{node.companion ? ` & ${node.companion.fullName}` : ""}</strong>
+        <span>{describeRelation(node.member, byId, rootId)}{age !== null ? ` · ${age} Jahre` : ""}</span>
+        {node.companion && (
+          <span>{describeRelation(node.companion, byId, rootId)}{companionAge !== null ? ` · ${companionAge} Jahre` : ""}</span>
+        )}
+      </div>
+      {node.children.length > 0 && (
+        <div className="family-branch-children">
+          {node.children.map((child) => <BranchNode key={child.member.id} node={child} rootId={rootId} byId={byId} />)}
+        </div>
+      )}
     </div>
   );
 }
@@ -268,28 +271,21 @@ function TreeNode({ member }: { member: FamilyMember }) {
 export function FamilyTree({ members }: { members: FamilyMember[] }) {
   if (members.length === 0) return null;
 
-  const generations = computeGenerations(members);
-  const groups = new Map<number, FamilyMember[]>();
-  for (const m of members) {
-    const gen = generations.get(m.id) ?? 0;
-    const list = groups.get(gen) ?? [];
-    list.push(m);
-    groups.set(gen, list);
-  }
-  const sortedGenerations = Array.from(groups.keys()).sort((a, b) => a - b);
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const hasExplicitRoot = members.some((m) => m.isSelf);
+  const rootId = pickRootId(members);
+  const branches = rootId != null ? buildFamilyBranches(members, byId, rootId) : [];
 
   return (
     <Section title="Familienstruktur">
       <div className="card">
+        {!hasExplicitRoot && (
+          <p className="lede" style={{ marginTop: -4, marginBottom: 10 }}>
+            Lege in der Personenliste fest, wer "Ich" ist (Stern-Symbol), damit der Stammbaum von der richtigen Stelle aus aufgebaut wird.
+          </p>
+        )}
         <div className="family-tree">
-          {sortedGenerations.map((gen) => (
-            <div className="family-tree-group" key={gen}>
-              <div className="family-tree-group-title">{generationLabel(gen)}</div>
-              <div className="family-tree-row">
-                {groups.get(gen)!.map((m) => <TreeNode key={m.id} member={m} />)}
-              </div>
-            </div>
-          ))}
+          {branches.map((branch) => <BranchNode key={branch.member.id} node={branch} rootId={rootId} byId={byId} />)}
         </div>
       </div>
     </Section>

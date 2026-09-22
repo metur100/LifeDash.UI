@@ -44,7 +44,7 @@ export interface DashboardResponse {
 
 export interface FamilyMember {
   id: number; userId: number; fullName: string; relation?: string | null;
-  relatedToFamilyMemberId?: number | null; relationType?: string | null;
+  relatedToFamilyMemberId?: number | null; relationType?: string | null; isSelf: boolean;
   birthDate?: string | null; nationality?: string | null;
   schoolName?: string | null; schoolGrade?: string | null;
   schoolNote?: string | null; jmbg?: string | null; notes?: string | null;

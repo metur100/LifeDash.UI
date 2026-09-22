@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Appointment, FamilyMember, ImportantDate } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { AppointmentCategoryDonut, AppointmentLoadChart, ImportantDatesTimeline } from "../components/FamilyCharts";
+import { AppointmentCategoryDonut, AppointmentLoadChart } from "../components/FamilyCharts";
 import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
 import { countdown, dateTime, daysUntil, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -578,14 +578,11 @@ export default function Termine() {
       .filter(([, value]) => value > 0);
   }, [appts.data, appointmentCategoryOptions]);
 
-  const importantDateTimelineItems = useMemo(() => {
+  const sortedDates = useMemo(() => {
     return (dates.data ?? [])
-      .map((d) => {
-        const iso = nextImportantOccurrence(d);
-        const offsetDays = daysUntil(iso) ?? -1;
-        return { id: d.id, title: d.title, category: (d.category || "other").toLowerCase(), offsetDays, iso };
-      })
-      .filter((x) => x.offsetDays >= 0 && x.offsetDays <= 365);
+      .map((d) => ({ date: d, offsetDays: daysUntil(nextImportantOccurrence(d)) ?? Number.MAX_SAFE_INTEGER }))
+      .sort((a, b) => a.offsetDays - b.offsetDays)
+      .map((x) => x.date);
   }, [dates.data]);
 
   const apptByDay = useMemo(() => {
@@ -860,8 +857,6 @@ export default function Termine() {
         )}
       </Section>
 
-      <ImportantDatesTimeline items={importantDateTimelineItems} />
-
       <Section title="Wichtige Anlässe" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
         {(dates.data ?? []).length === 0
           ? <Empty title="Noch keine wichtigen Anlässe." hint="Geburtstage, Jahrestage und weitere wiederkehrende Anlässe erscheinen hier." />
@@ -870,7 +865,7 @@ export default function Termine() {
                 <table>
                   <thead><tr><th>Anlass</th><th>Kategorie</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
-                    {(dates.data ?? []).map((d) => (
+                    {sortedDates.map((d) => (
                       <tr key={d.id}>
                         <td><strong>{d.title}</strong></td>
                         <td><span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category, importantDateCategoryOptions)}</span></td>
@@ -896,7 +891,7 @@ export default function Termine() {
               </div>
 
               <div className="rtable-cards">
-                {(dates.data ?? []).map((d) => (
+                {sortedDates.map((d) => (
                   <div key={`m-${d.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{d.title}</strong>

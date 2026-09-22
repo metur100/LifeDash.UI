@@ -2,11 +2,10 @@ import { useState } from "react";
 import { api } from "../api/client";
 import type { FamilyMember } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { AgeDistributionChart, FamilyTree, RELATION_TYPE_OPTIONS, ageFromBirthDate } from "../components/FamilyCharts";
+import { AgeDistributionChart, FamilyTree, RELATION_TYPE_OPTIONS, ageFromBirthDate, describeRelation, pickRootId } from "../components/FamilyCharts";
 import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
 import { shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
-import { useCustomOptions } from "../lib/useCustomOptions";
 
 type PersonMeta = {
   heightCm: string;
@@ -130,19 +129,6 @@ function buildPersonNotes(meta: PersonMeta): string | null {
   return `${META_START}\n${lines.join("\n")}\n${META_END}`;
 }
 
-const PERSON_ROLE_OPTIONS = [
-  { value: "", label: "-" },
-  { value: "Ich", label: "Ich" },
-  { value: "Mutter", label: "Mutter" },
-  { value: "Vater", label: "Vater" },
-  { value: "Schwester", label: "Schwester" },
-  { value: "Bruder", label: "Bruder" },
-  { value: "Ehepartner", label: "Ehepartner" },
-  { value: "Sohn", label: "Sohn" },
-  { value: "Tochter", label: "Tochter" },
-  { value: "Sonstige", label: "Sonstige" },
-];
-
 export default function Family() {
   const members = useAsync<FamilyMember[]>(() => api.get("/api/family-members"), []);
   const dialog = useDialog();
@@ -150,8 +136,6 @@ export default function Family() {
   const [detailsMember, setDetailsMember] = useState<FamilyMember | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [closeDetailsOnBackdropClick, setCloseDetailsOnBackdropClick] = useState(false);
-  const customRoles = useCustomOptions("family-relation-label");
-  const roleOptions = [...PERSON_ROLE_OPTIONS, ...customRoles.options];
 
   function relatedToOptions(excludeId?: number) {
     return [
@@ -169,10 +153,6 @@ export default function Family() {
       fields: [
         { key: "sec-basic", label: "Basis", type: "section" },
         { key: "fullName", label: "Name" },
-        {
-          key: "relation", label: "Rolle", type: "select", options: roleOptions,
-          allowCustomOption: { onAdd: (label) => customRoles.add(label, roleOptions) },
-        },
         { key: "relatedToFamilyMemberId", label: "Bezug zu", type: "select", options: relatedToOptions() },
         { key: "relationType", label: "Beziehungsart", type: "select", options: RELATION_TYPE_OPTIONS },
         { key: "birthDate", label: "Geburtstag", type: "date" },
@@ -205,7 +185,6 @@ export default function Family() {
       ],
       initial: {
         fullName: "",
-        relation: "",
         relatedToFamilyMemberId: "",
         relationType: "",
         birthDate: "",
@@ -264,7 +243,7 @@ export default function Family() {
 
       await api.post("/api/family-members", {
         fullName: String(values.fullName).trim(),
-        relation: String(values.relation).trim() || null,
+        relation: null,
         relatedToFamilyMemberId: String(values.relatedToFamilyMemberId ?? "").trim() ? Number(values.relatedToFamilyMemberId) : null,
         relationType: String(values.relationType ?? "").trim() || null,
         birthDate: String(values.birthDate).trim() || null,
@@ -283,10 +262,6 @@ export default function Family() {
       fields: [
         { key: "sec-basic", label: "Basis", type: "section" },
         { key: "fullName", label: "Name" },
-        {
-          key: "relation", label: "Rolle", type: "select", options: roleOptions,
-          allowCustomOption: { onAdd: (label) => customRoles.add(label, roleOptions) },
-        },
         { key: "relatedToFamilyMemberId", label: "Bezug zu", type: "select", options: relatedToOptions(m.id) },
         { key: "relationType", label: "Beziehungsart", type: "select", options: RELATION_TYPE_OPTIONS },
         { key: "birthDate", label: "Geburtstag", type: "date" },
@@ -319,7 +294,6 @@ export default function Family() {
       ],
       initial: {
         fullName: m.fullName,
-        relation: m.relation ?? "",
         relatedToFamilyMemberId: m.relatedToFamilyMemberId != null ? String(m.relatedToFamilyMemberId) : "",
         relationType: m.relationType ?? "",
         birthDate: m.birthDate ?? "",
@@ -378,7 +352,6 @@ export default function Family() {
       await api.put(`/api/family-members/${m.id}`, {
         ...m,
         fullName: String(values.fullName).trim(),
-        relation: String(values.relation).trim() || null,
         relatedToFamilyMemberId: String(values.relatedToFamilyMemberId ?? "").trim() ? Number(values.relatedToFamilyMemberId) : null,
         relationType: String(values.relationType ?? "").trim() || null,
         birthDate: String(values.birthDate).trim() || null,
@@ -395,6 +368,13 @@ export default function Family() {
     if (!ok) return;
     try {
       await api.del(`/api/family-members/${id}`);
+      members.reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function setAsSelf(m: FamilyMember) {
+    try {
+      await api.put(`/api/family-members/${m.id}`, { ...m, isSelf: true });
       members.reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -425,6 +405,9 @@ export default function Family() {
     ? membersWithAge.reduce((a, b) => (b.age > a.age ? b : a))
     : null;
 
+  const membersById = new Map((members.data ?? []).map((m) => [m.id, m]));
+  const rootId = pickRootId(members.data ?? []);
+
   return (
     <>
       <PageHead eyebrow="Familie" title="Wer zu wem gehört"
@@ -447,15 +430,25 @@ export default function Family() {
           : <div className="card">
               <div className="table-scroll rtable-desktop">
                 <table>
-                  <thead><tr><th>Name</th><th>Rolle</th><th>Geburtstag</th><th className="num action-col">Aktion</th></tr></thead>
+                  <thead><tr><th>Name</th><th>Beziehung</th><th>Geburtstag</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
                     {(members.data ?? []).map((m) => (
                       <tr key={m.id}>
                         <td><strong>{m.fullName}</strong></td>
-                        <td>{m.relation ?? "—"}</td>
+                        <td>{describeRelation(m, membersById, rootId)}</td>
                         <td>{shortDate(m.birthDate)}</td>
                         <td className="num action-cell">
                           <div className="action-stack">
+                          <button
+                            className={`btn ghost small icon-only ${m.isSelf ? "on" : ""}`}
+                            aria-label={m.isSelf ? "Ausgangspunkt des Stammbaums" : "Als Ausgangspunkt festlegen (Ich)"}
+                            title={m.isSelf ? "Ausgangspunkt des Stammbaums" : "Als Ausgangspunkt festlegen (Ich)"}
+                            onClick={() => setAsSelf(m)}
+                            disabled={m.isSelf}
+                          >
+                            <i className={`${m.isSelf ? "fa-solid" : "fa-regular"} fa-star`} aria-hidden />
+                            <span className="sr-only">Als Ausgangspunkt festlegen</span>
+                          </button>{" "}
                           <button
                             className="btn ghost small icon-only"
                             aria-label="Personendetails"
@@ -489,10 +482,20 @@ export default function Family() {
                   <div key={`m-${m.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{m.fullName}</strong>
-                      <span className="badge">{m.relation ?? "—"}</span>
+                      <span className="badge">{describeRelation(m, membersById, rootId)}</span>
                     </div>
                     <div className="alert-msg">Geburtstag: {shortDate(m.birthDate)}</div>
                     <div className="action-stack mobile-card-actions">
+                      <button
+                        className={`btn ghost small icon-only ${m.isSelf ? "on" : ""}`}
+                        aria-label={m.isSelf ? "Ausgangspunkt des Stammbaums" : "Als Ausgangspunkt festlegen (Ich)"}
+                        title={m.isSelf ? "Ausgangspunkt des Stammbaums" : "Als Ausgangspunkt festlegen (Ich)"}
+                        onClick={() => setAsSelf(m)}
+                        disabled={m.isSelf}
+                      >
+                        <i className={`${m.isSelf ? "fa-solid" : "fa-regular"} fa-star`} aria-hidden />
+                        <span className="sr-only">Als Ausgangspunkt festlegen</span>
+                      </button>
                       <button
                         className="btn ghost small icon-only"
                         aria-label="Personendetails"
@@ -545,7 +548,7 @@ export default function Family() {
                     title: "Basis",
                     rows: [
                       ["Name", detailsMember.fullName],
-                      ["Rolle", detailsMember.relation ?? ""],
+                      ["Beziehung", describeRelation(detailsMember, membersById, rootId)],
                       ["Geburtsdatum", shortDate(detailsMember.birthDate)],
                       ["Geburtsort", meta.birthPlace],
                       ["Staatsangehörigkeit", detailsMember.nationality ?? ""],
