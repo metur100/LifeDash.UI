@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.lifedash",
+      "sha256_cert_fingerprints": [
+        "B3:DF:C3:14:92:E4:C4:96:E4:F6:FD:13:99:BE:9C:6C:A2:5C:B7:9C:D0:D9:36:DD:8E:53:52:11:D8:2B:EE:AA"
+      ]
+    }
+  }
+]
