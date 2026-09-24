@@ -682,9 +682,9 @@ export default function Termine() {
       const d = new Date(start.getFullYear(), start.getMonth(), day);
       cells.push({ iso: dateIso(d), day, inMonth: true });
     }
-    while (cells.length % 7 !== 0) {
+    for (let after = 1; cells.length % 7 !== 0; after += 1) {
       const d = new Date(end);
-      d.setDate(d.getDate() + (cells.length % 7));
+      d.setDate(d.getDate() + after);
       cells.push({ iso: dateIso(d), day: d.getDate(), inMonth: false });
     }
     return cells;
