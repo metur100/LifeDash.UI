@@ -8,6 +8,11 @@ import { countdown, dateTime, daysUntil, shortDate, today } from "../lib/format"
 import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
 import type { Option } from "../lib/categories";
+import type { DialogField } from "../components/Dialog";
+import {
+  RECURRENCE_OPTIONS, atOccurrence, dayAfter, expandAppointments, nextOccurrence,
+  normalizeRecurrence, recurrenceLabel,
+} from "../lib/recurrence";
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const MONTH_CELL_LIMIT = 3;
@@ -213,6 +218,18 @@ function occurrenceInMonth(d: ImportantDate, cursor: Date): string | null {
   return dateIso(new Date(year, month - 1, safeDay));
 }
 
+// Shared by every appointment form; "bis" only shows once a repeat rule is picked.
+const RECURRENCE_FIELDS: DialogField[] = [
+  { key: "recurrence", label: "Wiederholung", type: "select", options: RECURRENCE_OPTIONS },
+  { key: "recurrenceUntil", label: "Wiederholen bis (optional)", type: "date", visibleWhen: (d) => !!normalizeRecurrence(d.recurrence) },
+];
+
+function recurrencePayload(values: Record<string, unknown>) {
+  const recurrence = normalizeRecurrence(values.recurrence);
+  const until = String(values.recurrenceUntil ?? "").trim();
+  return { recurrence, recurrenceUntil: recurrence && until ? until : null };
+}
+
 function attendeeNames(ids: number[], memberNameById: Map<number, string>): string {
   return ids.map((id) => memberNameById.get(id) ?? "Person").join(", ");
 }
@@ -223,6 +240,8 @@ function appointmentTooltip(a: Appointment, memberNameById: Map<number, string>,
     `Kategorie: ${categoryLabel(a.category, categoryOptions)}`,
     `Zeit: ${dateTime(a.startsAt)}`,
   ];
+  const repeat = recurrenceLabel(a.recurrence);
+  if (repeat) lines.push(`Wiederholung: ${repeat}${a.recurrenceUntil ? ` bis ${shortDate(a.recurrenceUntil)}` : ""}`);
   if (a.location) lines.push(`Ort: ${a.location}`);
   if (a.attendeeIds.length > 0) lines.push(`Personen: ${attendeeNames(a.attendeeIds, memberNameById)}`);
   return lines.join("\n");
@@ -298,40 +317,58 @@ export default function Termine() {
     }
   }
 
+  // Calendar/list entries of a series are per-occurrence copies; edits always go to the stored series.
+  function seriesOf(a: Appointment): Appointment {
+    return (appts.data ?? []).find((x) => x.id === a.id) ?? a;
+  }
+
+  // `a` may be an occurrence copy. Completing one occurrence of a series moves the series
+  // anchor to the following occurrence; once there is none left the series is done.
   async function completeAppointment(a: Appointment) {
+    const series = seriesOf(a);
     try {
-      await api.put(`/api/appointments/${a.id}`, { ...a, isDone: true });
+      if (normalizeRecurrence(series.recurrence)) {
+        const following = nextOccurrence(series, dayAfter(a.startsAt));
+        await api.put(`/api/appointments/${series.id}`, following
+          ? atOccurrence(series, following)
+          : { ...series, isDone: true });
+      } else {
+        await api.put(`/api/appointments/${series.id}`, { ...series, isDone: true });
+      }
       appts.reload();
     } catch (e) { setError((e as Error).message); }
   }
 
   async function reopenAppointment(a: Appointment) {
     try {
-      await api.put(`/api/appointments/${a.id}`, { ...a, isDone: false });
+      await api.put(`/api/appointments/${a.id}`, { ...seriesOf(a), isDone: false });
       appts.reload();
     } catch (e) { setError((e as Error).message); }
   }
 
-  async function editAppointment(a: Appointment) {
+  async function editAppointment(occurrence: Appointment) {
+    const a = seriesOf(occurrence);
     const memberOptions = [
       { value: "", label: "-" },
       ...(members.data ?? []).map((m) => ({ value: String(m.id), label: m.fullName })),
     ];
 
+    const isSeries = !!normalizeRecurrence(a.recurrence);
     const values = await dialog.form({
-      title: "Termin bearbeiten",
+      title: isSeries ? "Terminserie bearbeiten" : "Termin bearbeiten",
       submitText: "Speichern",
       secondarySubmitText: "Duplizieren",
       secondarySubmitValue: "duplicate",
       fields: [
         { key: "title", label: "Termin" },
-        { key: "startsAt", label: "Start", type: "datetime-local" },
+        { key: "startsAt", label: isSeries ? "Start (erster Termin der Serie)" : "Start", type: "datetime-local" },
         { key: "location", label: "Ort" },
         {
           key: "category", label: "Kategorie", type: "select", options: appointmentCategoryOptions,
           allowCustomOption: { onAdd: (label) => customAppointmentCategories.add(label, appointmentCategoryOptions) },
         },
         { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
+        ...RECURRENCE_FIELDS,
       ],
       initial: {
         title: a.title,
@@ -339,6 +376,8 @@ export default function Termine() {
         location: a.location ?? "",
         category: normalizeCategory(a.category, appointmentCategoryOptions),
         attendeeIds: a.attendeeIds.join(","),
+        recurrence: normalizeRecurrence(a.recurrence) ?? "",
+        recurrenceUntil: a.recurrenceUntil ?? "",
       },
     });
     if (!values) return;
@@ -352,6 +391,7 @@ export default function Termine() {
         attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: a.reminderDays,
         isDone: false,
+        ...recurrencePayload(values),
       };
 
       const action = String((values as Record<string, unknown>).__dialogAction ?? "");
@@ -368,7 +408,10 @@ export default function Termine() {
   }
 
   async function removeAppointment(id: number) {
-    const ok = await dialog.confirm({ title: "Termin löschen", message: "Termin wirklich löschen?", confirmText: "Löschen", danger: true });
+    const isSeries = !!normalizeRecurrence((appts.data ?? []).find((x) => x.id === id)?.recurrence);
+    const ok = await dialog.confirm(isSeries
+      ? { title: "Terminserie löschen", message: "Die ganze Terminserie mit allen Wiederholungen löschen?", confirmText: "Löschen", danger: true }
+      : { title: "Termin löschen", message: "Termin wirklich löschen?", confirmText: "Löschen", danger: true });
     if (!ok) return;
     try {
       await api.del(`/api/appointments/${id}`);
@@ -448,6 +491,7 @@ export default function Termine() {
           allowCustomOption: { onAdd: (label) => customAppointmentCategories.add(label, appointmentCategoryOptions) },
         },
         { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
+        ...RECURRENCE_FIELDS,
       ],
       initial: {
         title: "",
@@ -455,6 +499,8 @@ export default function Termine() {
         location: "",
         category: "family",
         attendeeIds: "",
+        recurrence: "",
+        recurrenceUntil: "",
       },
     });
     if (!values) return;
@@ -468,6 +514,7 @@ export default function Termine() {
         category: normalizeCategory(String(values.category), appointmentCategoryOptions),
         attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: 3,
+        ...recurrencePayload(values),
         isDone: false,
       });
       appts.reload();
@@ -492,6 +539,7 @@ export default function Termine() {
           allowCustomOption: { onAdd: (label) => customAppointmentCategories.add(label, appointmentCategoryOptions) },
         },
         { key: "attendeeIds", label: "Personen", type: "multiselect", options: memberOptions.slice(1) },
+        ...RECURRENCE_FIELDS,
       ],
       initial: {
         title: "",
@@ -499,6 +547,8 @@ export default function Termine() {
         location: "",
         category: "family",
         attendeeIds: "",
+        recurrence: "",
+        recurrenceUntil: "",
       },
     });
     if (!values) return;
@@ -514,6 +564,7 @@ export default function Termine() {
         category: normalizeCategory(String(values.category), appointmentCategoryOptions),
         attendeeIds: String(values.attendeeIds ?? "").split(",").map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0),
         reminderDays: 3,
+        ...recurrencePayload(values),
         isDone: false,
       });
       appts.reload();
@@ -563,18 +614,25 @@ export default function Termine() {
   }
 
   const UPCOMING_WINDOW_DAYS = 14;
-  const allUpcoming = (appts.data ?? [])
-    .filter((a) => !a.isDone)
+  // A series is listed once, at its next occurrence; a series whose end date has passed
+  // counts as done.
+  const openAppointments = (appts.data ?? []).filter((a) => !a.isDone);
+  const allUpcoming = openAppointments
+    .flatMap((a) => {
+      const next = nextOccurrence(a);
+      return next ? [atOccurrence(a, next)] : [];
+    })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const endedSeries = openAppointments.filter((a) => nextOccurrence(a) === null);
   const upcoming = showAllUpcoming
     ? allUpcoming
     : allUpcoming.filter((a) => {
         const days = daysUntil(a.startsAt.slice(0, 10));
         return days === null || days <= UPCOMING_WINDOW_DAYS;
       });
-  const doneAppointments = (appts.data ?? [])
-    .filter((a) => a.isDone)
+  const doneAppointments = [...(appts.data ?? []).filter((a) => a.isDone), ...endedSeries]
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  const loadChartAppointments = expandAppointments(openAppointments, today(), dateIso(addDaysDate(new Date(), UPCOMING_WINDOW_DAYS)));
   const memberNameById = new Map((members.data ?? []).map((m) => [m.id, m.fullName]));
 
   const appointmentCategoryData = useMemo(() => {
@@ -595,17 +653,6 @@ export default function Termine() {
       .sort((a, b) => a.offsetDays - b.offsetDays)
       .map((x) => x.date);
   }, [dates.data]);
-
-  const apptByDay = useMemo(() => {
-    const map = new Map<string, Appointment[]>();
-    for (const a of (appts.data ?? []).filter((x) => !x.isDone)) {
-      const day = a.startsAt.slice(0, 10);
-      const list = map.get(day) ?? [];
-      list.push(a);
-      map.set(day, list);
-    }
-    return map;
-  }, [appts.data]);
 
   const calendarCells = useMemo(() => {
     if (calendarView === "week") {
@@ -642,6 +689,21 @@ export default function Termine() {
     }
     return cells;
   }, [monthCursor, calendarView]);
+
+  // Repeating appointments get one entry per occurrence inside the visible cells.
+  const apptByDay = useMemo(() => {
+    const map = new Map<string, Appointment[]>();
+    if (calendarCells.length === 0) return map;
+    const from = calendarCells[0].iso;
+    const to = calendarCells[calendarCells.length - 1].iso;
+    for (const a of expandAppointments(appts.data ?? [], from, to)) {
+      const day = a.startsAt.slice(0, 10);
+      const list = map.get(day) ?? [];
+      list.push(a);
+      map.set(day, list);
+    }
+    return map;
+  }, [appts.data, calendarCells]);
 
   // Covers every month the visible cells touch, so a week crossing a month boundary still shows its dates.
   const importantByDay = useMemo(() => {
@@ -789,7 +851,10 @@ export default function Termine() {
                         }}
                       >
                         {time && time !== "00:00" && <span className="appt-time">{time}</span>}
-                        <span className="appt-title">{a.title}</span>
+                        <span className="appt-title">
+                          {normalizeRecurrence(a.recurrence) && <i className="fa-solid fa-repeat" aria-label="Wiederkehrend" style={{ marginRight: 4, fontSize: "0.85em", opacity: 0.75 }} />}
+                          {a.title}
+                        </span>
                         {calendarView === "week" && (a.location || a.attendeeIds.length > 0) && (
                           <span className="appt-meta">
                             {[a.location, a.attendeeIds.length > 0 ? attendeeNames(a.attendeeIds, memberNameById) : null].filter(Boolean).join(" · ")}
@@ -843,9 +908,13 @@ export default function Termine() {
                     <div className="alert-msg">
                       {categoryLabel(a.category, appointmentCategoryOptions)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
                       {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
+                      {recurrenceLabel(a.recurrence) ? ` · ${recurrenceLabel(a.recurrence)}${a.recurrenceUntil ? ` bis ${shortDate(a.recurrenceUntil)}` : ""}` : ""}
                     </div>
                     <div className="action-stack mobile-card-actions">
-                      <button className="btn ghost small icon-only" aria-label="Termin als erledigt markieren" title="Termin als erledigt markieren" onClick={() => completeAppointment(a)}>
+                      <button className="btn ghost small icon-only"
+                        aria-label={normalizeRecurrence(a.recurrence) ? "Diesen Termin der Serie als erledigt markieren" : "Termin als erledigt markieren"}
+                        title={normalizeRecurrence(a.recurrence) ? "Diesen Termin der Serie als erledigt markieren" : "Termin als erledigt markieren"}
+                        onClick={() => completeAppointment(a)}>
                         <i className="fa-solid fa-check" aria-hidden />
                         <span className="sr-only">Erledigt</span>
                       </button>
@@ -872,12 +941,20 @@ export default function Termine() {
                   <div className="alert-msg">
                     {categoryLabel(a.category)} · {dateTime(a.startsAt)}{a.location ? ` · ${a.location}` : ""}
                     {a.attendeeIds.length > 0 ? ` · ${attendeeNames(a.attendeeIds, memberNameById)}` : ""}
+                    {!a.isDone ? " · Serie beendet" : ""}
                   </div>
                   <div className="action-stack mobile-card-actions">
-                    <button className="btn ghost small icon-only" aria-label="Termin wieder öffnen" title="Termin wieder öffnen" onClick={() => reopenAppointment(a)}>
-                      <i className="fa-solid fa-rotate-left" aria-hidden />
-                      <span className="sr-only">Wieder öffnen</span>
-                    </button>
+                    {a.isDone ? (
+                      <button className="btn ghost small icon-only" aria-label="Termin wieder öffnen" title="Termin wieder öffnen" onClick={() => reopenAppointment(a)}>
+                        <i className="fa-solid fa-rotate-left" aria-hidden />
+                        <span className="sr-only">Wieder öffnen</span>
+                      </button>
+                    ) : (
+                      <button className="btn ghost small icon-only" aria-label="Serie bearbeiten" title="Serie bearbeiten" onClick={() => editAppointment(a)}>
+                        <i className="fa-solid fa-pen-to-square" aria-hidden />
+                        <span className="sr-only">Bearbeiten</span>
+                      </button>
+                    )}
                     <button className="btn danger small icon-only" aria-label="Termin löschen" title="Termin löschen" onClick={() => removeAppointment(a.id)}>
                       <i className="fa-solid fa-trash" aria-hidden />
                       <span className="sr-only">Löschen</span>
@@ -892,7 +969,7 @@ export default function Termine() {
 
       <div className="chart-row">
         <AppointmentCategoryDonut categories={appointmentCategoryData} />
-        <AppointmentLoadChart appointments={appts.data ?? []} horizonDays={14} bucketDays={1} title="Terminlast · nächste 14 Tage" />
+        <AppointmentLoadChart appointments={loadChartAppointments}horizonDays={14} bucketDays={1} title="Terminlast · nächste 14 Tage" />
       </div>
 
       <Section title="Wichtige Anlässe" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>

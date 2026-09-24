@@ -66,6 +66,8 @@ export interface Appointment {
   id: number; userId: number; attendeeIds: number[];
   title: string; category: string; startsAt: string; endsAt?: string | null;
   location?: string | null; reminderDays: number; notes?: string | null; isDone: boolean;
+  /** null = one-off; daily|weekly|biweekly|monthly|yearly. startsAt is the series anchor. */
+  recurrence?: string | null; recurrenceUntil?: string | null;
 }
 
 export interface ImportantDate {
