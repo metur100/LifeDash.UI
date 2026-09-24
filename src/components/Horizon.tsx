@@ -1,29 +1,73 @@
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Alert } from "../api/types";
-import { countdown } from "../lib/format";
+import { countdown, localDateIso, shortDate } from "../lib/format";
 
 /**
- * The signature element: every deadline in the next N days plotted on one
- * timeline. Pins are positioned on a sqrt scale so the next two weeks get
- * room to breathe while distant items still stay visible.
+ * The signature element: every deadline in the next N days laid out as a
+ * compact Mo-So calendar (same look as the Termine calendar). Overdue items
+ * can't sit on a future grid, so they get their own strip above it.
  */
-function scaleLabels(horizon: number): string[] {
-  if (horizon <= 14) return ["heute", `${Math.round(horizon / 2)} Tage`, `${horizon} Tage`];
-  if (horizon <= 30) return ["heute", "1 Woche", "2 Wochen", "3 Wochen", `${horizon} Tage`];
-  if (horizon <= 60) return ["heute", "1 Woche", "2 Wochen", "1 Monat", `${horizon} Tage`];
-  return ["heute", "1 Woche", "1 Monat", "2 Monate", `${horizon} Tage`];
+const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const CELL_LIMIT = 3;
+
+function addDays(d: Date, n: number) {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + n);
+  return copy;
+}
+
+function startOfWeek(d: Date) {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  copy.setDate(copy.getDate() - ((copy.getDay() + 6) % 7));
+  return copy;
+}
+
+function dueIso(a: Alert): string | null {
+  if (a.dueOn) return a.dueOn.slice(0, 10);
+  return a.daysLeft === null ? null : localDateIso(addDays(new Date(), a.daysLeft));
 }
 
 export default function Horizon({ alerts, horizon = 30 }:
   { alerts: Alert[]; horizon?: number }) {
   const navigate = useNavigate();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const dated = alerts.filter((a) => a.daysLeft !== null && a.daysLeft <= horizon);
-  const pos = (d: number) => {
-    const clamped = Math.max(-14, Math.min(d, horizon));
-    if (clamped < 0) return (1 - Math.sqrt(Math.abs(clamped) / 14)) * 8;
-    return 8 + Math.sqrt(clamped / horizon) * 90;
-  };
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+  const todayIso = localDateIso(todayDate);
+  const lastIso = localDateIso(addDays(todayDate, horizon));
+
+  const overdue = alerts
+    .filter((a) => a.daysLeft !== null && a.daysLeft < 0)
+    .sort((a, b) => a.daysLeft! - b.daysLeft!);
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, Alert[]>();
+    for (const a of alerts) {
+      if (a.daysLeft === null || a.daysLeft < 0 || a.daysLeft > horizon) continue;
+      const iso = dueIso(a);
+      if (!iso) continue;
+      const list = map.get(iso) ?? [];
+      list.push(a);
+      map.set(iso, list);
+    }
+    for (const list of map.values()) list.sort((a, b) => b.severity - a.severity);
+    return map;
+  }, [alerts, horizon]);
+
+  // Whole weeks from this Monday until the Sunday after the horizon's last day.
+  const cells = useMemo(() => {
+    const base = new Date(`${todayIso}T00:00:00`);
+    const start = startOfWeek(base);
+    const end = addDays(startOfWeek(addDays(base, horizon)), 6);
+    const out: Array<{ iso: string; date: Date }> = [];
+    for (let d = start; d <= end; d = addDays(d, 1)) out.push({ iso: localDateIso(d), date: d });
+    return out;
+  }, [todayIso, horizon]);
+
+  const open = (a: Alert) => { if (a.actionPath) navigate(a.actionPath); };
 
   return (
     <div className="horizon">
@@ -37,27 +81,56 @@ export default function Horizon({ alerts, horizon = 30 }:
         </div>
       </div>
 
-      <div className="track">
-        <div className="track-line" />
-        <div className="track-today" style={{ left: "8%" }} />
-        {dated.map((a) => (
-          <button
-            key={a.id}
-            className={`pin pin-${a.severity}`}
-            style={{ left: `${pos(a.daysLeft!)}%` }}
-            title={`${a.title} — ${countdown(a.daysLeft)}`}
-            aria-label={`${a.title}, ${countdown(a.daysLeft)}`}
-            onClick={() => a.actionPath && navigate(a.actionPath)}
-          >
-            <i /><b />
-          </button>
-        ))}
-      </div>
+      {overdue.length > 0 && (
+        <div className="horizon-overdue">
+          <span className="horizon-overdue-label">Überfällig</span>
+          {overdue.map((a) => (
+            <button key={a.id} type="button" className="badge red"
+              title={`${a.title} — ${a.message}`} onClick={() => open(a)}>
+              {a.title} · {countdown(a.daysLeft)}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div className="track-scale" aria-hidden>
-        {scaleLabels(horizon).map((label) => (
-          <span key={label}>{label}</span>
-        ))}
+      <div className="family-calendar month-view horizon-cal">
+        {WEEKDAYS.map((wd) => <div key={wd} className="family-calendar-wd">{wd}</div>)}
+
+        {cells.map((cell) => {
+          const inWindow = cell.iso >= todayIso && cell.iso <= lastIso;
+          const items = byDay.get(cell.iso) ?? [];
+          const showAll = expanded.has(cell.iso);
+          const visible = showAll ? items : items.slice(0, CELL_LIMIT);
+          const hidden = items.length - visible.length;
+          const isToday = cell.iso === todayIso;
+          const firstOfMonth = cell.date.getDate() === 1;
+          return (
+            <div key={cell.iso}
+              className={`family-calendar-cell ${inWindow ? "" : "out"} ${items.length > 0 ? "has-items" : ""} ${isToday ? "today" : ""}`}
+              title={items.length > 0 ? `${shortDate(cell.iso)}\n${items.map((a) => `• ${a.title}`).join("\n")}` : undefined}>
+              <div className="calendar-cell-head">
+                <span className="day">
+                  {cell.date.getDate()}{firstOfMonth && `. ${cell.date.toLocaleDateString("de-DE", { month: "short" })}`}
+                  {isToday && <span className="sr-only"> (heute)</span>}
+                </span>
+              </div>
+              {visible.map((a) => (
+                <button key={a.id} type="button" className={`appt hz-sev-${a.severity}`}
+                  title={`${a.title} — ${a.message}`}
+                  aria-label={`${a.title}, ${countdown(a.daysLeft)}`}
+                  onClick={() => open(a)}>
+                  <span className="appt-title">{a.title}</span>
+                </button>
+              ))}
+              {hidden > 0 && (
+                <button type="button" className="appt more" title="Alle Fristen dieses Tages zeigen"
+                  onClick={() => setExpanded((s) => new Set(s).add(cell.iso))}>
+                  +{hidden}
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

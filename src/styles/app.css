@@ -319,89 +319,46 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
   align-items: baseline;
   gap: 16px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 .horizon-title { font-family: var(--display); font-size: 18px; font-weight: 600; }
 .horizon-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--text); }
 .horizon-legend span { display: flex; align-items: center; gap: 6px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 15%, transparent); }
 
-.track { position: relative; height: 96px; margin: 0 4px; }
-.track-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 44px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--line);
+/* Horizon as a compact read-only calendar: reuses .family-calendar, chips coloured by severity. */
+.horizon-cal .family-calendar-cell { cursor: default; min-height: 78px; }
+.horizon-cal .family-calendar-cell:hover { border-color: var(--line); box-shadow: none; }
+.horizon-cal .family-calendar-cell.has-items:hover { border-color: color-mix(in srgb, var(--accent) 36%, var(--line)); }
+.horizon-cal .family-calendar-cell.today:hover { border-color: var(--accent); }
+.horizon-cal .appt { font-family: inherit; }
+.horizon-cal .appt:hover, .horizon-cal .appt:focus-visible { filter: brightness(0.96); }
+.family-calendar-cell .appt.hz-sev-0 { border-left-color: var(--text-soft); }
+.family-calendar-cell .appt.hz-sev-1 { border-left-color: var(--accent); }
+.family-calendar-cell .appt.hz-sev-2 { border-left-color: var(--warning); }
+.family-calendar-cell .appt.hz-sev-3 { border-left-color: var(--danger); }
+
+.horizon-overdue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
 }
-.track-today {
-  position: absolute;
-  top: 14px;
-  bottom: 24px;
-  width: 2px;
-  background: var(--text);
-}
-.track-today::after {
-  content: "heute";
-  position: absolute;
-  top: -16px;
-  left: 50%;
-  transform: translateX(-50%);
+.horizon-overdue-label {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text);
+  color: var(--danger);
+  margin-right: 4px;
 }
-.pin {
-  position: absolute;
-  top: 26px;
-  transform: translateX(-50%);
-  width: 18px;
-  height: 34px;
-  padding: 0;
-  border: none;
-  background: none;
-  cursor: pointer;
-}
-.pin i {
-  display: block;
-  width: 2px;
-  height: 18px;
-  margin: 0 auto;
-  background: currentColor;
-  opacity: 0.65;
-}
-.pin b {
-  display: block;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: currentColor;
-  border: 3px solid var(--card);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-  margin: -1px auto 0;
-}
-.pin:hover b, .pin:focus-visible b { transform: scale(1.35); }
-.pin b { transition: transform 0.15s ease; }
-.pin-0 { color: var(--text-soft); }
-.pin-1 { color: var(--accent); }
-.pin-2 { color: var(--warning); }
-.pin-3 { color: var(--danger); }
+.horizon-overdue .badge { cursor: pointer; font-family: inherit; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.track-scale {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-soft);
-  border-top: 1px dashed var(--line);
-  padding-top: 8px;
-  margin: 0 4px;
+@media (max-width: 640px) {
+  .horizon { padding: 14px 8px 10px; }
+  .horizon-cal .family-calendar-cell { min-height: 64px; }
 }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
