@@ -9,6 +9,9 @@ import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
 import type { Option } from "../lib/categories";
 
+const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const MONTH_CELL_LIMIT = 3;
+
 const IMPORTANT_META_START = "[important-meta]";
 const IMPORTANT_META_END = "[/important-meta]";
 
@@ -256,7 +259,8 @@ export default function Termine() {
   const dates = useAsync<ImportantDate[]>(() => api.get("/api/important-dates"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
-  const [monthCursor, setMonthCursor] = useState(() => monthStartDate(new Date()));
+  // Any date inside the shown month/week; month view renders from monthStartDate(monthCursor).
+  const [monthCursor, setMonthCursor] = useState(() => new Date());
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [mailScanBusy, setMailScanBusy] = useState(false);
   const [mailScanMessage, setMailScanMessage] = useState<string | null>(null);
@@ -265,6 +269,13 @@ export default function Termine() {
   const appointmentCategoryOptions = [...APPOINTMENT_CATEGORIES, ...customAppointmentCategories.options];
   const customImportantDateCategories = useCustomOptions("important-date-category");
   const importantDateCategoryOptions = [...IMPORTANT_DATE_CATEGORIES, ...customImportantDateCategories.options];
+
+  // Month navigation leaves the cursor on the 1st; for the current month open this week instead of the 1st's week.
+  function showWeekView() {
+    const now = new Date();
+    setMonthCursor((m) => (m.getFullYear() === now.getFullYear() && m.getMonth() === now.getMonth() ? now : m));
+    setCalendarView("week");
+  }
 
   async function scanAppointmentsMailbox() {
     setError(null);
@@ -596,18 +607,6 @@ export default function Termine() {
     return map;
   }, [appts.data]);
 
-  const importantByDay = useMemo(() => {
-    const map = new Map<string, ImportantDate[]>();
-    for (const d of (dates.data ?? [])) {
-      const iso = occurrenceInMonth(d, monthCursor);
-      if (!iso) continue;
-      const list = map.get(iso) ?? [];
-      list.push(d);
-      map.set(iso, list);
-    }
-    return map;
-  }, [dates.data, monthCursor]);
-
   const calendarCells = useMemo(() => {
     if (calendarView === "week") {
       const weekStart = startOfWeek(monthCursor);
@@ -616,7 +615,7 @@ export default function Termine() {
         return {
           iso: dateIso(d),
           day: d.getDate(),
-          inMonth: d.getMonth() === monthCursor.getMonth(),
+          inMonth: true,
         };
       });
     }
@@ -644,6 +643,23 @@ export default function Termine() {
     return cells;
   }, [monthCursor, calendarView]);
 
+  // Covers every month the visible cells touch, so a week crossing a month boundary still shows its dates.
+  const importantByDay = useMemo(() => {
+    const monthKeys = new Set(calendarCells.map((c) => c.iso.slice(0, 7)));
+    const map = new Map<string, ImportantDate[]>();
+    for (const key of monthKeys) {
+      const [y, m] = key.split("-").map(Number);
+      for (const d of (dates.data ?? [])) {
+        const iso = occurrenceInMonth(d, new Date(y, m - 1, 1));
+        if (!iso) continue;
+        const list = map.get(iso) ?? [];
+        list.push(d);
+        map.set(iso, list);
+      }
+    }
+    return map;
+  }, [dates.data, calendarCells]);
+
   const weekLabel = useMemo(() => {
     const s = startOfWeek(monthCursor);
     const e = addDaysDate(s, 6);
@@ -664,43 +680,43 @@ export default function Termine() {
         <button className="btn icon-only" aria-label="Termin anlegen" title="Termin anlegen" onClick={addAppointment}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Termin anlegen</span></button>
       </>}>
         {mailScanMessage && <p className="lede" style={{ marginTop: -4, marginBottom: 10 }}>{mailScanMessage}</p>}
-        <div className="card">
-          <div className="row" style={{ marginBottom: 10 }}>
-            <button className="btn ghost small icon-only" aria-label={calendarView === "month" ? "Vorheriger Monat" : "Vorherige Woche"} title={calendarView === "month" ? "Vorheriger Monat" : "Vorherige Woche"} onClick={() => setMonthCursor((m) => calendarView === "month" ? addMonth(m, -1) : addDaysDate(m, -7))}>
-              <i className="fa-solid fa-chevron-left" aria-hidden />
-              <span className="sr-only">Vorheriger Monat</span>
-            </button>
-            <strong style={{ minWidth: 170, textAlign: "center" }}>
-              {calendarView === "month" ? monthCursor.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : weekLabel}
-            </strong>
-            <button className="btn ghost small icon-only" aria-label={calendarView === "month" ? "Nächster Monat" : "Nächste Woche"} title={calendarView === "month" ? "Nächster Monat" : "Nächste Woche"} onClick={() => setMonthCursor((m) => calendarView === "month" ? addMonth(m, 1) : addDaysDate(m, 7))}>
-              <i className="fa-solid fa-chevron-right" aria-hidden />
-              <span className="sr-only">Nächster Monat</span>
-            </button>
-            <div className="spacer" />
-            <button className={`chip ${calendarView === "month" ? "on" : ""}`} onClick={() => setCalendarView("month")}>Monat</button>
-            <button className={`chip ${calendarView === "week" ? "on" : ""}`} onClick={() => setCalendarView("week")}>Woche</button>
-            <button className="btn ghost small" onClick={() => setMonthCursor(new Date())}>Heute</button>
+        <div className="card calendar-card">
+          <div className="cal-toolbar">
+            <div className="cal-nav">
+              <button className="btn ghost small icon-only" aria-label={calendarView === "month" ? "Vorheriger Monat" : "Vorherige Woche"} title={calendarView === "month" ? "Vorheriger Monat" : "Vorherige Woche"} onClick={() => setMonthCursor((m) => calendarView === "month" ? addMonth(m, -1) : addDaysDate(m, -7))}>
+                <i className="fa-solid fa-chevron-left" aria-hidden />
+                <span className="sr-only">Zurück</span>
+              </button>
+              <strong className="cal-label">
+                {calendarView === "month" ? monthCursor.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : weekLabel}
+              </strong>
+              <button className="btn ghost small icon-only" aria-label={calendarView === "month" ? "Nächster Monat" : "Nächste Woche"} title={calendarView === "month" ? "Nächster Monat" : "Nächste Woche"} onClick={() => setMonthCursor((m) => calendarView === "month" ? addMonth(m, 1) : addDaysDate(m, 7))}>
+                <i className="fa-solid fa-chevron-right" aria-hidden />
+                <span className="sr-only">Weiter</span>
+              </button>
+            </div>
+            <div className="cal-views">
+              <button className={`chip ${calendarView === "month" ? "on" : ""}`} onClick={() => setCalendarView("month")}>Monat</button>
+              <button className={`chip ${calendarView === "week" ? "on" : ""}`} onClick={showWeekView}>Woche</button>
+              <button className="btn ghost small" onClick={() => setMonthCursor(new Date())}>Heute</button>
+            </div>
           </div>
 
-          <div className="family-calendar">
-            {[
-              "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So",
-            ].map((wd) => <div key={wd} className="family-calendar-wd">{wd}</div>)}
+          <div className={`family-calendar ${calendarView === "week" ? "week-view" : "month-view"}`}>
+            {WEEKDAYS.map((wd) => <div key={wd} className="family-calendar-wd">{wd}</div>)}
 
-            <div className="family-calendar-legend">
-              {APPOINTMENT_CATEGORIES.map((c) => (
-                <span key={c.value} className={`badge appt-cat-${c.value}`}>{c.label}</span>
-              ))}
-              <span className="badge important-date">Wichtige Daten</span>
-            </div>
-
-            {calendarCells.map((cell) => {
+            {calendarCells.map((cell, idx) => {
               const isToday = cell.iso === today();
-              const items = apptByDay.get(cell.iso) ?? [];
+              const items = [...(apptByDay.get(cell.iso) ?? [])].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
               const importantItems = importantByDay.get(cell.iso) ?? [];
+              const total = items.length + importantItems.length;
               const dayDistance = daysUntil(cell.iso) ?? 999;
-              const hasNearReminder = (items.length + importantItems.length) > 0 && dayDistance >= 0 && dayDistance <= 2;
+              const hasNearReminder = total > 0 && dayDistance >= 0 && dayDistance <= 2;
+              // Month view keeps cells even: show a few entries, the rest behind "+N" (opens that week).
+              const limit = calendarView === "month" ? MONTH_CELL_LIMIT : Number.MAX_SAFE_INTEGER;
+              const visibleImportant = importantItems.slice(0, limit);
+              const visibleItems = items.slice(0, Math.max(0, limit - visibleImportant.length));
+              const hidden = total - visibleImportant.length - visibleItems.length;
               const cellTooltipLines: string[] = [];
               for (const d of importantItems) {
                 cellTooltipLines.push(`• ${d.title} (Wichtiges Datum)`);
@@ -716,7 +732,7 @@ export default function Termine() {
               return (
                 <div
                   key={cell.iso}
-                  className={`family-calendar-cell ${cell.inMonth ? "" : "out"} ${(items.length + importantItems.length) > 0 ? "has-items" : ""} ${isToday ? "today" : ""}`}
+                  className={`family-calendar-cell ${cell.inMonth ? "" : "out"} ${total > 0 ? "has-items" : ""} ${isToday ? "today" : ""}`}
                   title={cellTitle}
                   role="button"
                   tabIndex={0}
@@ -729,10 +745,13 @@ export default function Termine() {
                   }}
                 >
                   <div className="calendar-cell-head">
+                    {calendarView === "week" && <span className="wd">{WEEKDAYS[idx % 7]}</span>}
                     <span className="day">{cell.day}{isToday && <span className="sr-only"> (heute)</span>}</span>
+                    {calendarView === "week" && <span className="month">{new Date(`${cell.iso}T00:00:00`).toLocaleDateString("de-DE", { month: "short" })}</span>}
                     {hasNearReminder && <span className="calendar-reminder-dot" title="Erinnerung in den nächsten 2 Tagen" />}
+                    {calendarView === "week" && total === 0 && <span className="cal-empty">Keine Termine</span>}
                   </div>
-                  {importantItems.map((d) => (
+                  {visibleImportant.map((d) => (
                     <span
                       key={`imp-${d.id}`}
                       className="appt important-date"
@@ -748,50 +767,64 @@ export default function Termine() {
                         }
                       }}
                     >
-                      {d.title}
+                      <span className="appt-title">{d.title}</span>
                     </span>
                   ))}
-                  {items.map((a) => (
-                    <span
-                      key={a.id}
-                      className={`appt appt-cat-${normalizeCategory(a.category, appointmentCategoryOptions)}`}
-                      title={appointmentTooltip(a, memberNameById, appointmentCategoryOptions)}
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => { e.stopPropagation(); void editAppointment(a); }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          void editAppointment(a);
-                        }
-                      }}
-                    >
-                      <span className="appt-title">{a.title}</span>
-                      <button
-                        className="appt-done-btn"
-                        title="Termin als erledigt markieren"
-                        aria-label="Termin als erledigt markieren"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void completeAppointment(a);
+                  {visibleItems.map((a) => {
+                    const time = a.startsAt.slice(11, 16);
+                    return (
+                      <span
+                        key={a.id}
+                        className={`appt appt-cat-${normalizeCategory(a.category, appointmentCategoryOptions)}`}
+                        title={appointmentTooltip(a, memberNameById, appointmentCategoryOptions)}
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); void editAppointment(a); }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void editAppointment(a);
+                          }
                         }}
                       >
-                        <i className="fa-solid fa-check" aria-hidden />
-                      </button>
-                    </span>
-                  ))}
+                        {time && time !== "00:00" && <span className="appt-time">{time}</span>}
+                        <span className="appt-title">{a.title}</span>
+                        {calendarView === "week" && (a.location || a.attendeeIds.length > 0) && (
+                          <span className="appt-meta">
+                            {[a.location, a.attendeeIds.length > 0 ? attendeeNames(a.attendeeIds, memberNameById) : null].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                  {hidden > 0 && (
+                    <button
+                      type="button"
+                      className="appt more"
+                      title="Alle Termine dieses Tages in der Wochenansicht zeigen"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMonthCursor(new Date(`${cell.iso}T00:00:00`));
+                        setCalendarView("week");
+                      }}
+                    >
+                      +{hidden}
+                    </button>
+                  )}
                 </div>
               );
             })}
           </div>
+
+          <div className="family-calendar-legend">
+            {APPOINTMENT_CATEGORIES.map((c) => (
+              <span key={c.value} className={`badge appt-cat-${c.value}`}>{c.label}</span>
+            ))}
+            <span className="badge important-date">Wichtige Daten</span>
+          </div>
         </div>
       </Section>
-
-      <div className="chart-row">
-        <AppointmentCategoryDonut categories={appointmentCategoryData} />
-        <AppointmentLoadChart appointments={appts.data ?? []} horizonDays={14} bucketDays={1} title="Terminlast · nächste 14 Tage" />
-      </div>
 
       <Section title={showAllUpcoming ? "Termine · alle" : "Termine · nächste 14 Tage"}
         action={<button className={`chip ${showAllUpcoming ? "on" : ""}`} onClick={() => setShowAllUpcoming((v) => !v)}>
@@ -856,6 +889,11 @@ export default function Termine() {
           </div>
         )}
       </Section>
+
+      <div className="chart-row">
+        <AppointmentCategoryDonut categories={appointmentCategoryData} />
+        <AppointmentLoadChart appointments={appts.data ?? []} horizonDays={14} bucketDays={1} title="Terminlast · nächste 14 Tage" />
+      </div>
 
       <Section title="Wichtige Anlässe" action={<button className="btn icon-only" aria-label="Datum anlegen" title="Datum anlegen" onClick={addDate}><i className="fa-solid fa-plus" aria-hidden /><span className="sr-only">Datum anlegen</span></button>}>
         {(dates.data ?? []).length === 0

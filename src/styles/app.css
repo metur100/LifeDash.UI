@@ -1160,53 +1160,57 @@ textarea { min-height: 70px; resize: vertical; }
 }
 
 .family-calendar-cell .appt {
-  display: block;
   width: 100%;
-  font-size: 10px;
-  line-height: 1.2;
+  font-size: 11px;
+  line-height: 1.25;
   color: #173042;
-  border-radius: 999px;
-  padding: 2px 6px;
+  border-radius: 5px;
+  padding: 3px 6px;
   border: 1px solid transparent;
+  border-left-width: 3px;
   background: #ecf2f8;
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 4px;
   overflow: hidden;
   cursor: pointer;
+  text-align: left;
+}
+
+.appt-time {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .appt-title {
+  flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.appt-done-btn {
-  margin-left: auto;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.appt-done-btn:hover {
-  background: rgba(0, 0, 0, 0.08);
+.appt-meta {
+  flex-basis: 100%;
+  font-size: 0.9em;
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .family-calendar-cell .appt.more {
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 700;
   background: transparent;
   border: 0;
-  padding: 0;
-  display: block;
+  padding: 1px 2px;
+  font-family: inherit;
+  width: auto;
+  align-self: flex-start;
 }
 
 .family-calendar-cell .appt.important-date,
@@ -1331,15 +1335,156 @@ textarea { min-height: 70px; resize: vertical; }
   background: #243446;
 }
 
-[data-theme="dark"] .appt-done-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
 [data-theme="dark"] .family-calendar-cell .appt.important-date,
 [data-theme="dark"] .badge.important-date {
   color: #ffddcf;
   border-color: #8b4f3d;
   background: #3a2721;
+}
+
+/* ---------- calendar toolbar + views ---------- */
+.cal-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-label {
+  min-width: 170px;
+  text-align: center;
+}
+
+.cal-views {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.family-calendar.month-view .family-calendar-cell {
+  min-height: 104px;
+}
+
+/* Grid items default to min-width: auto; long titles must never push a day box wider. */
+.family-calendar-cell,
+.family-calendar-cell .appt {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.family-calendar-legend {
+  margin: 12px 0 0;
+}
+
+/* Week view: taller day columns with full appointment details. */
+.family-calendar.week-view .family-calendar-cell {
+  min-height: 220px;
+}
+
+.family-calendar.week-view .family-calendar-wd {
+  display: none;
+}
+
+.family-calendar.week-view .calendar-cell-head {
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.family-calendar.week-view .calendar-cell-head .wd {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.family-calendar.week-view .calendar-cell-head .day {
+  font-size: 15px;
+}
+
+.family-calendar.week-view .calendar-cell-head .month {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.family-calendar.week-view .cal-empty {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.family-calendar.week-view .appt {
+  font-size: 12px;
+  padding: 5px 7px;
+}
+
+.family-calendar.week-view .appt-title {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Tablet */
+@media (max-width: 980px) {
+  .family-calendar { gap: 4px; }
+  .family-calendar.month-view .family-calendar-cell { min-height: 96px; padding: 4px; }
+  .family-calendar.month-view .appt { font-size: 10.5px; padding: 2px 4px; }
+  .family-calendar.week-view { grid-template-columns: 1fr; gap: 8px; }
+  .family-calendar.week-view .family-calendar-cell { min-height: 0; padding: 10px 12px; }
+  .family-calendar.week-view .calendar-cell-head .cal-empty { flex-basis: auto; margin-left: auto; }
+  .family-calendar.week-view .appt { font-size: 14px; padding: 8px 10px; }
+}
+
+/* Phone */
+@media (max-width: 640px) {
+  .card.calendar-card { padding: 12px 6px; }
+
+  .cal-toolbar { gap: 8px; }
+  .cal-nav { width: 100%; }
+  .cal-nav .btn.icon-only { width: 40px; height: 40px; }
+  .cal-label { flex: 1; min-width: 0; font-size: 16px; }
+  .cal-views { width: 100%; margin-left: 0; }
+  .cal-views .chip { flex: 1; padding: 9px 8px; font-size: 12px; }
+  .cal-views .btn { flex: 1; }
+
+  .family-calendar { gap: 2px; }
+  .family-calendar.month-view .family-calendar-cell {
+    min-height: 84px;
+    padding: 2px;
+    gap: 2px;
+    border-radius: 6px;
+  }
+  .family-calendar.month-view .calendar-cell-head { justify-content: center; padding-top: 2px; }
+  .family-calendar.month-view .calendar-reminder-dot { width: 6px; height: 6px; }
+  .family-calendar.month-view .appt {
+    font-size: 9.5px;
+    line-height: 1.2;
+    padding: 2px 3px;
+    border-left-width: 2px;
+    border-radius: 3px;
+  }
+  /* No room for times in a ~50px wide day box: title wraps over two lines instead. */
+  .family-calendar.month-view .appt-time { display: none; }
+  .family-calendar.month-view .appt-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+  .family-calendar.month-view .appt.more { font-size: 11px; align-self: center; }
+
+  .family-calendar.week-view .family-calendar-cell { padding: 10px; }
+
+  .family-calendar-legend { gap: 4px; }
+  .family-calendar-legend .badge { font-size: 10px; padding: 2px 6px; }
 }
 
 .empty {
@@ -1762,15 +1907,6 @@ textarea { min-height: 70px; resize: vertical; }
   .contracts-table .action-cell .btn.icon-only.small {
     width: 28px;
     height: 28px;
-  }
-
-  .family-calendar-cell {
-    min-height: 62px;
-    padding: 4px;
-  }
-
-  .family-calendar-cell .appt {
-    font-size: 9px;
   }
 
   th,
