@@ -443,7 +443,12 @@ export function FamilyTree({ members, onSelect }: { members: FamilyMember[]; onS
 
   if (members.length === 0 || !layout) return null;
   const byId = new Map(layout.placed.map((n) => [n.member.id, n]));
-  const scale = available > 0 ? Math.min(1, available / layout.width) : 1;
+  // "Ich" always sits in the middle of the card: scale so the wider side of the tree fits into
+  // half the card, then shift the canvas so the root's centre lands on the card's centre.
+  const rootCenter = layout.placed[0].x + NODE_W / 2;
+  const halfWidth = Math.max(rootCenter, layout.width - rootCenter);
+  const scale = available > 0 ? Math.min(1, available / (2 * halfWidth)) : 1;
+  const offsetX = available > 0 ? available / 2 - rootCenter * scale : 0;
   const stacked = available > 0 && scale < MIN_TREE_SCALE;
 
   const nodeButton = (m: FamilyMember, label: string, isRoot = false, style?: CSSProperties) => {
@@ -478,16 +483,24 @@ export function FamilyTree({ members, onSelect }: { members: FamilyMember[]; onS
               {bands.map((b) => (
                 <div key={b.generation} className={`family-band ${b.generation === 0 ? "is-self" : ""}`}>
                   <span className="family-band-title">{generationTitle(b.generation)}</span>
-                  <div className="family-band-nodes">
-                    {b.nodes.map((n) => nodeButton(n.member, n.label, n.parentId == null))}
-                  </div>
+                  {/* "Ich" gets its own centred line; partner and siblings wrap below it. */}
+                  {b.nodes.some((n) => n.parentId == null) && (
+                    <div className="family-band-nodes family-band-root">
+                      {b.nodes.filter((n) => n.parentId == null).map((n) => nodeButton(n.member, n.label, true))}
+                    </div>
+                  )}
+                  {b.nodes.some((n) => n.parentId != null) && (
+                    <div className="family-band-nodes">
+                      {b.nodes.filter((n) => n.parentId != null).map((n) => nodeButton(n.member, n.label))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           ) : (
             <div className="family-tree-fit" style={{ height: layout.height * scale }}>
               <div className="family-tree-canvas"
-                style={{ width: layout.width, height: layout.height, transform: scale < 1 ? `scale(${scale})` : undefined, marginLeft: scale < 1 ? 0 : "auto" }}>
+                style={{ width: layout.width, height: layout.height, transform: `translateX(${offsetX}px) scale(${scale})` }}>
                 <svg className="family-tree-edges" width={layout.width} height={layout.height} aria-hidden>
                   {layout.placed.filter((n) => n.parentId != null).map((n) => (
                     <path key={n.member.id} d={edgePath(byId.get(n.parentId!)!, n, layout)}
