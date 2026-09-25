@@ -106,7 +106,8 @@ export default function AlertDetailsDialog({ alert, onClose }: { alert: Alert | 
       ["Ort", a.location],
       ["Teilnehmer", a.attendeeIds.map((id) => names.get(id)).filter(Boolean).join(", ")],
       ["Wiederholung", recurrence ? `${recurrence}${a.recurrenceUntil ? ` bis ${shortDate(a.recurrenceUntil)}` : ""}` : null],
-      ["Erinnerung", a.reminderDays > 0 ? `${a.reminderDays} Tage vorher` : null],
+      // Mirrors ReminderEmailWorker; the stored reminderDays isn't used for appointments.
+      ["Erinnerung", "1 Tag vorher und ca. 1 Std. vor Beginn (E-Mail)"],
     );
     notes = readableNotes(a.notes);
   } else if (details?.kind === "date") {
@@ -117,6 +118,7 @@ export default function AlertDetailsDialog({ alert, onClose }: { alert: Alert | 
       ["Datum", shortDate(d.dateValue)],
       ["Person", person?.fullName],
       ["Wiederholung", d.repeatsYearly ? "jährlich" : null],
+      ["Erinnerung", "Am Tag selbst (E-Mail)"],
     );
     notes = readableNotes(d.notes);
   }
