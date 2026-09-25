@@ -3096,9 +3096,12 @@ textarea { min-height: 70px; resize: vertical; }
 
 /* Family structure centred on "Ich": one row per generation (ancestors above, descendants
    below), same-level relatives to the sides. Boxes are absolutely placed by FamilyTree's layout;
-   the SVG underneath draws the links. Scrolls sideways when wider than the card. */
-.family-tree-scroll { overflow: auto; margin: 0 -4px; padding: 0 4px; }
-.family-tree-canvas { position: relative; margin: 0 auto; }
+   the SVG underneath draws the links. Never scrolls sideways: a tree wider than the card is
+   scaled down, and when that would get too small FamilyTree switches to stacked generation
+   bands that wrap instead. */
+.family-tree-box { width: 100%; min-width: 0; }
+.family-tree-fit { width: 100%; overflow: hidden; }
+.family-tree-canvas { position: relative; transform-origin: top left; }
 .family-tree-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 .family-tree-edges path { fill: none; stroke: var(--line); stroke-width: 1.5; }
 .family-tree-edges path.spouse { stroke: var(--accent); stroke-dasharray: 4 3; }
@@ -3119,8 +3122,6 @@ textarea { min-height: 70px; resize: vertical; }
 .family-tree-node span { font-size: 11px; color: var(--text-soft); }
 .family-tree-unlinked { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
 .family-tree-unlinked-label { display: block; font-size: 12px; color: var(--text-soft); margin-bottom: 8px; }
-.family-tree-unlinked-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.family-tree-unlinked-list .family-tree-node { width: 156px; }
 
 .gantt { display: flex; flex-direction: column; gap: 10px; }
 .gantt-row { display: grid; grid-template-columns: minmax(90px, 160px) 1fr; align-items: center; gap: 10px; }
@@ -3151,4 +3152,23 @@ textarea { min-height: 70px; resize: vertical; }
 
 @media (max-width: 640px) {
   .gantt-row, .gantt-axis { grid-template-columns: 84px 1fr; }
+}
+
+/* Stacked family view (narrow screens): one band per generation, top = oldest. Cards wrap two
+   per line on phones; a short line between bands keeps the "up = ancestors" reading. */
+.family-bands { display: flex; flex-direction: column; gap: 18px; }
+.family-band { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.family-band + .family-band::before {
+  content: ""; position: absolute; top: -18px; left: 50%; width: 1.5px; height: 18px;
+  background: var(--line);
+}
+.family-band-title {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-soft); text-align: center;
+}
+.family-band.is-self { padding: 10px; border: 1px dashed var(--line); border-radius: 12px; }
+.family-band-nodes { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.family-band-nodes .family-tree-node { flex: 0 1 180px; min-width: 0; max-width: 100%; }
+@media (max-width: 420px) {
+  .family-band-nodes .family-tree-node { flex: 1 1 calc(50% - 4px); max-width: calc(50% - 4px); }
 }
