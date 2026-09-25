@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import type { FamilyMember } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { AgeDistributionChart, FamilyTree, RELATION_TYPE_OPTIONS, ageFromBirthDate, describeRelation, pickRootId } from "../components/FamilyCharts";
+import { AgeDistributionChart, RELATION_TYPE_OPTIONS, ageFromBirthDate, describeRelation, pickRootId } from "../components/FamilyCharts";
 import { Empty, ErrorBar, PageHead, Pager, Section, Stat, usePaged } from "../components/Ui";
 import { shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -412,10 +412,9 @@ export default function Family() {
   return (
     <>
       <PageHead eyebrow="Familie" title="Wer zu wem gehört"
-        lede="Personen, Familienstruktur und Altersverteilung deiner Familie." />
+        lede="Personen und Altersverteilung deiner Familie." />
       <ErrorBar message={error ?? members.error} />
 
-      <FamilyTree members={members.data ?? []} onSelect={(m) => { setCopiedField(null); setDetailsMember(m); }} />
       <AgeDistributionChart members={members.data ?? []} />
 
       <div className="stats">
@@ -442,13 +441,13 @@ export default function Family() {
                           <div className="action-stack">
                           <button
                             className={`btn ghost small icon-only ${m.isSelf ? "on" : ""}`}
-                            aria-label={m.isSelf ? "Ausgangspunkt des Stammbaums" : "Als Ausgangspunkt festlegen (Ich)"}
-                            title={m.isSelf ? "Ausgangspunkt des Stammbaums" : "Als Ausgangspunkt festlegen (Ich)"}
+                            aria-label={m.isSelf ? "Das bin ich" : "Als \"Ich\" festlegen"}
+                            title={m.isSelf ? "Das bin ich" : "Als \"Ich\" festlegen"}
                             onClick={() => setAsSelf(m)}
                             disabled={m.isSelf}
                           >
                             <i className={`${m.isSelf ? "fa-solid" : "fa-regular"} fa-star`} aria-hidden />
-                            <span className="sr-only">Als Ausgangspunkt festlegen</span>
+                            <span className="sr-only">Als "Ich" festlegen</span>
                           </button>{" "}
                           <button
                             className="btn ghost small icon-only"
@@ -489,13 +488,13 @@ export default function Family() {
                     <div className="action-stack mobile-card-actions">
                       <button
                         className={`btn ghost small icon-only ${m.isSelf ? "on" : ""}`}
-                        aria-label={m.isSelf ? "Ausgangspunkt des Stammbaums" : "Als Ausgangspunkt festlegen (Ich)"}
-                        title={m.isSelf ? "Ausgangspunkt des Stammbaums" : "Als Ausgangspunkt festlegen (Ich)"}
+                        aria-label={m.isSelf ? "Das bin ich" : "Als \"Ich\" festlegen"}
+                        title={m.isSelf ? "Das bin ich" : "Als \"Ich\" festlegen"}
                         onClick={() => setAsSelf(m)}
                         disabled={m.isSelf}
                       >
                         <i className={`${m.isSelf ? "fa-solid" : "fa-regular"} fa-star`} aria-hidden />
-                        <span className="sr-only">Als Ausgangspunkt festlegen</span>
+                        <span className="sr-only">Als "Ich" festlegen</span>
                       </button>
                       <button
                         className="btn ghost small icon-only"
