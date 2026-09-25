@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { HomeItem } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, Section, usePaged } from "../components/Ui";
 import { euro, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
@@ -21,6 +21,8 @@ export default function WishList() {
 
   const open = wishes.filter((w) => w.status !== "done");
   const done = wishes.filter((w) => w.status === "done");
+  const openPaged = usePaged(open);
+  const donePaged = usePaged(done);
 
   async function addWish() {
     const values = await dialog.form({
@@ -150,7 +152,7 @@ export default function WishList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {open.map((w) => (
+                  {openPaged.pageItems.map((w) => (
                     <tr key={w.id}>
                       <td>
                         <strong>{w.title}</strong>
@@ -180,7 +182,7 @@ export default function WishList() {
             </div>
 
             <div className="rtable-cards">
-              {open.map((w) => (
+              {openPaged.pageItems.map((w) => (
                 <div key={`m-${w.id}`} className="mobile-card">
                   <div className="mobile-card-head">
                     <strong>{w.title}</strong>
@@ -204,6 +206,7 @@ export default function WishList() {
                 </div>
               ))}
             </div>
+            <Pager paged={openPaged} />
             </>
           )}
         </div>
@@ -225,7 +228,7 @@ export default function WishList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {done.map((w) => (
+                  {donePaged.pageItems.map((w) => (
                     <tr key={w.id}>
                       <td>
                         <strong>{w.title}</strong>
@@ -251,7 +254,7 @@ export default function WishList() {
             </div>
 
             <div className="rtable-cards">
-              {done.map((w) => (
+              {donePaged.pageItems.map((w) => (
                 <div key={`m-${w.id}`} className="mobile-card">
                   <div className="mobile-card-head">
                     <strong>{w.title}</strong>
@@ -271,6 +274,7 @@ export default function WishList() {
                 </div>
               ))}
             </div>
+            <Pager paged={donePaged} />
             </>
           )}
         </div>

@@ -3,10 +3,11 @@ import { api } from "../api/client";
 import type { Appointment, FamilyMember, ImportantDate } from "../api/types";
 import { useDialog } from "../components/Dialog";
 import { AppointmentCategoryDonut, AppointmentLoadChart } from "../components/FamilyCharts";
-import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, Section, usePaged } from "../components/Ui";
 import { countdown, dateTime, daysUntil, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
+import { APPOINTMENT_CATEGORIES, IMPORTANT_DATE_CATEGORIES } from "../lib/categories";
 import type { Option } from "../lib/categories";
 import type { DialogField } from "../components/Dialog";
 import {
@@ -145,27 +146,6 @@ function monthsBetween(a: Date, b: Date): number {
   return (a.getFullYear() - b.getFullYear()) * 12 + (a.getMonth() - b.getMonth());
 }
 
-const APPOINTMENT_CATEGORIES = [
-  { value: "family", label: "Familie" },
-  { value: "birthday", label: "Geburtstag" },
-  { value: "anniversary", label: "Jahrestag" },
-  { value: "authority", label: "Behörde" },
-  { value: "health", label: "Gesundheit" },
-  { value: "school", label: "Schule" },
-  { value: "work", label: "Arbeit" },
-  { value: "finance", label: "Finanzen" },
-  { value: "travel", label: "Reise" },
-  { value: "home", label: "Haushalt" },
-  { value: "other", label: "Sonstiges" },
-];
-
-const IMPORTANT_DATE_CATEGORIES = [
-  { value: "birthday", label: "Geburtstag" },
-  { value: "wedding", label: "Hochzeitstag" },
-  { value: "anniversary", label: "Jahrestag" },
-  { value: "other", label: "Sonstiges" },
-];
-
 function importantDateCategoryLabel(category: string | null | undefined, options: Option[] = IMPORTANT_DATE_CATEGORIES): string {
   const key = String(category ?? "").trim().toLowerCase();
   return options.find((o) => o.value === key)?.label ?? (key || "Sonstiges");
@@ -283,7 +263,6 @@ export default function Termine() {
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [mailScanBusy, setMailScanBusy] = useState(false);
   const [mailScanMessage, setMailScanMessage] = useState<string | null>(null);
-  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const customAppointmentCategories = useCustomOptions("appointment-category");
   const appointmentCategoryOptions = [...APPOINTMENT_CATEGORIES, ...customAppointmentCategories.options];
   const customImportantDateCategories = useCustomOptions("important-date-category");
@@ -624,14 +603,10 @@ export default function Termine() {
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const endedSeries = openAppointments.filter((a) => nextOccurrence(a) === null);
-  const upcoming = showAllUpcoming
-    ? allUpcoming
-    : allUpcoming.filter((a) => {
-        const days = daysUntil(a.startsAt.slice(0, 10));
-        return days === null || days <= UPCOMING_WINDOW_DAYS;
-      });
+  const upcomingPaged = usePaged(allUpcoming);
   const doneAppointments = [...(appts.data ?? []).filter((a) => a.isDone), ...endedSeries]
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  const donePaged = usePaged(doneAppointments);
   const loadChartAppointments = expandAppointments(openAppointments, today(), dateIso(addDaysDate(new Date(), UPCOMING_WINDOW_DAYS)));
   const memberNameById = new Map((members.data ?? []).map((m) => [m.id, m.fullName]));
 
@@ -653,6 +628,7 @@ export default function Termine() {
       .sort((a, b) => a.offsetDays - b.offsetDays)
       .map((x) => x.date);
   }, [dates.data]);
+  const datesPaged = usePaged(sortedDates);
 
   const calendarCells = useMemo(() => {
     if (calendarView === "week") {
@@ -891,15 +867,12 @@ export default function Termine() {
         </div>
       </Section>
 
-      <Section title={showAllUpcoming ? "Termine · alle" : "Termine · nächste 14 Tage"}
-        action={<button className={`chip ${showAllUpcoming ? "on" : ""}`} onClick={() => setShowAllUpcoming((v) => !v)}>
-          {showAllUpcoming ? "Nur nächste 14 Tage" : "Alle anzeigen"}
-        </button>}>
-        {upcoming.length === 0
+      <Section title="Anstehende Termine">
+        {upcomingPaged.total === 0
           ? <Empty title="Keine offenen Termine." hint="Neue Termine erscheinen hier, sobald du sie anlegst." />
           : <div className="card">
               <div className="card-list">
-                {upcoming.map((a) => (
+                {upcomingPaged.pageItems.map((a) => (
                   <div key={a.id} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{a.title}</strong>
@@ -930,12 +903,13 @@ export default function Termine() {
                   </div>
                 ))}
               </div>
+              <Pager paged={upcomingPaged} />
             </div>}
         {doneAppointments.length > 0 && (
           <div className="card" style={{ marginTop: 12 }}>
             <strong>Erledigte Termine</strong>
             <div className="card-list" style={{ marginTop: 10 }}>
-              {doneAppointments.map((a) => (
+              {donePaged.pageItems.map((a) => (
                 <div key={a.id} className="mobile-card">
                   <strong>{a.title}</strong>
                   <div className="alert-msg">
@@ -963,6 +937,7 @@ export default function Termine() {
                 </div>
               ))}
             </div>
+            <Pager paged={donePaged} />
           </div>
         )}
       </Section>
@@ -980,7 +955,7 @@ export default function Termine() {
                 <table>
                   <thead><tr><th>Anlass</th><th>Kategorie</th><th>Datum</th><th>Wiederholung</th><th className="num">Countdown</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
-                    {sortedDates.map((d) => (
+                    {datesPaged.pageItems.map((d) => (
                       <tr key={d.id}>
                         <td><strong>{d.title}</strong></td>
                         <td><span className={`badge important-date-cat-${(d.category || "other").toLowerCase()}`}>{importantDateCategoryLabel(d.category, importantDateCategoryOptions)}</span></td>
@@ -1006,7 +981,7 @@ export default function Termine() {
               </div>
 
               <div className="rtable-cards">
-                {sortedDates.map((d) => (
+                {datesPaged.pageItems.map((d) => (
                   <div key={`m-${d.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{d.title}</strong>
@@ -1029,6 +1004,7 @@ export default function Termine() {
                   </div>
                 ))}
               </div>
+              <Pager paged={datesPaged} />
             </div>}
       </Section>
     </>

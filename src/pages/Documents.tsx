@@ -3,7 +3,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { api, getToken } from "../api/client";
 import type { Doc } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { Empty, ErrorBar, PageHead } from "../components/Ui";
+import { Empty, ErrorBar, Pager, PageHead, usePaged } from "../components/Ui";
 import { countdown, daysUntil, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
@@ -628,6 +628,8 @@ export default function Documents() {
   const list = (docs.data ?? [])
     .filter((d) => filter === "all" || d.category === filter)
     .sort((a, b) => (a.expiresOn ?? "9999").localeCompare(b.expiresOn ?? "9999"));
+  const listPaged = usePaged(list);
+  const driveFilesPaged = usePaged(driveFiles);
 
   function driveFileActions(f: DriveFile) {
     if (f.mimeType === DRIVE_FOLDER_MIME) return null;
@@ -742,7 +744,7 @@ export default function Documents() {
 
             {driveViewMode === "grid" ? (
               <div className="docs-grid">
-                {driveFiles.slice(0, 20).map((f) => (
+                {driveFilesPaged.pageItems.map((f) => (
                   <Fragment key={f.id}>
                     <div className="doc-card">
                       <div className="doc-card-preview">
@@ -782,7 +784,7 @@ export default function Documents() {
                   <tr><th>Drive-Datei</th><th>Typ</th><th>Geändert</th><th className="num action-col">Aktion</th></tr>
                 </thead>
                 <tbody>
-                  {driveFiles.slice(0, 20).map((f) => (
+                  {driveFilesPaged.pageItems.map((f) => (
                     <Fragment key={f.id}>
                       <tr>
                         <td>
@@ -817,7 +819,7 @@ export default function Documents() {
               </div>
 
               <div className="rtable-cards">
-                {driveFiles.slice(0, 20).map((f) => (
+                {driveFilesPaged.pageItems.map((f) => (
                   <Fragment key={f.id}>
                     <div className="mobile-card">
                       <div className="mobile-card-head">
@@ -847,11 +849,7 @@ export default function Documents() {
               </div>
               </>
             )}
-            {driveFiles.length > 20 && (
-              <p className="auth-hint" style={{ marginTop: 8 }}>
-                Es werden 20 von {driveFiles.length} Drive-Dateien angezeigt. Mit Aktualisieren lädst du die aktuelle Liste neu.
-              </p>
-            )}
+            <Pager paged={driveFilesPaged} />
           </div>
         )}
       </div>
@@ -884,7 +882,7 @@ export default function Documents() {
           ? <Empty title="Keine Dokumente in dieser Kategorie." hint="Lege ein Dokument über das Plus an und lade die Datei hoch." />
           : viewMode === "grid" ? (
             <div className="docs-grid">
-              {list.map((d) => {
+              {listPaged.pageItems.map((d) => {
                 const days = daysUntil(d.expiresOn);
                 const isImage = (d.contentType ?? "").startsWith("image/");
                 return (
@@ -930,7 +928,7 @@ export default function Documents() {
                 <tr><th>Dokument</th><th>Kategorie</th><th>Läuft ab</th><th>Datei</th><th className="num action-col">Aktion</th></tr>
               </thead>
               <tbody>
-                {list.map((d) => {
+                {listPaged.pageItems.map((d) => {
                   const days = daysUntil(d.expiresOn);
                   return (
                     <tr key={d.id}>
@@ -971,7 +969,7 @@ export default function Documents() {
             </table></div>
 
             <div className="rtable-cards">
-              {list.map((d) => {
+              {listPaged.pageItems.map((d) => {
                 const days = daysUntil(d.expiresOn);
                 return (
                   <div key={d.id} className="mobile-card">
@@ -1009,7 +1007,7 @@ export default function Documents() {
               })}
             </div>
           </>}
-
+        <Pager paged={listPaged} />
       </div>
     </>
   );

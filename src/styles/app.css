@@ -433,6 +433,15 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
 .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 .alert-list { display: grid; gap: 8px; }
+
+.pager {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 8px; margin-top: 12px;
+}
+.pager-info { font-size: 12px; color: var(--text-soft); }
+.pager-pages { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pager-num { min-width: 30px; text-align: center; }
+.pager-gap { color: var(--text-soft); padding: 0 2px; }
 .alert {
   display: grid;
   grid-template-columns: 92px 1fr auto;
@@ -1511,6 +1520,16 @@ textarea { min-height: 70px; resize: vertical; }
 
 .person-details-dialog {
   width: min(980px, 100%);
+}
+
+.alert-details-dialog { width: min(560px, 100%); }
+.alert-details-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.alert-details-head h3 { overflow-wrap: anywhere; }
+.alert-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.alert-details-notes { margin-top: 12px; }
+.alert-details-notes p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .alert-details-grid { grid-template-columns: 1fr; }
 }
 
 [data-theme="dark"] .dlg {
@@ -3075,27 +3094,33 @@ textarea { min-height: 70px; resize: vertical; }
 .donut-cell-label { font-size: 12px; color: var(--text-soft); }
 .donut-cell-note { font-size: 11px; color: var(--text-soft); }
 
-/* Nested family structure: one bordered box per branch (a person + spouse, paired inline), with
-   descendants nested inside via indentation. Top-level branches (ancestors, siblings, in-laws,
-   ...) sit side by side. Deliberately no connecting lines anywhere - nesting/grouping alone
-   conveys the structure. */
-.family-tree { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; }
-.family-branch {
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 10px; border: 1px solid var(--line); border-radius: 12px;
-  background: var(--bg-2);
-}
-.family-branch-children {
-  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px;
-  padding-left: 20px;
-}
+/* Family structure centred on "Ich": one row per generation (ancestors above, descendants
+   below), same-level relatives to the sides. Boxes are absolutely placed by FamilyTree's layout;
+   the SVG underneath draws the links. Scrolls sideways when wider than the card. */
+.family-tree-scroll { overflow: auto; margin: 0 -4px; padding: 0 4px; }
+.family-tree-canvas { position: relative; margin: 0 auto; }
+.family-tree-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.family-tree-edges path { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.family-tree-edges path.spouse { stroke: var(--accent); stroke-dasharray: 4 3; }
+.family-tree-canvas .family-tree-node { position: absolute; }
 .family-tree-node {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px;
-  background: var(--card); min-width: 140px; max-width: 240px; text-align: left;
+  display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); text-align: left; font: inherit; color: inherit; cursor: pointer;
+  min-width: 0; box-sizing: border-box;
 }
-.family-tree-node strong { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 212px; }
+.family-tree-node:hover:not(:disabled) { border-color: var(--accent); }
+.family-tree-node:disabled { cursor: default; }
+.family-tree-node.is-root { border: 2px solid var(--accent); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
+.family-tree-node strong, .family-tree-node span {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.family-tree-node strong { font-size: 13px; color: var(--text); }
 .family-tree-node span { font-size: 11px; color: var(--text-soft); }
+.family-tree-unlinked { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.family-tree-unlinked-label { display: block; font-size: 12px; color: var(--text-soft); margin-bottom: 8px; }
+.family-tree-unlinked-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.family-tree-unlinked-list .family-tree-node { width: 156px; }
 
 .gantt { display: flex; flex-direction: column; gap: 10px; }
 .gantt-row { display: grid; grid-template-columns: minmax(90px, 160px) 1fr; align-items: center; gap: 10px; }

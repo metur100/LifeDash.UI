@@ -4,7 +4,7 @@ import type { ContractFlowType, FamilyMember, Subscription } from "../api/types"
 import ContractsTimeline from "../components/ContractsTimeline";
 import { useDialog } from "../components/Dialog";
 import { CostBreakdownDonut } from "../components/FinanceCharts";
-import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, Section, usePaged } from "../components/Ui";
 import { euro, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
@@ -50,6 +50,8 @@ export default function Contracts() {
       memberName: s.familyMemberId ? (memberNameById.get(s.familyMemberId) ?? "-") : "-",
     })).sort((a, b) => (a.s.startOn || "9999-12-31").localeCompare(b.s.startOn || "9999-12-31"));
   }, [contracts.data, memberNameById]);
+
+  const rowsPaged = usePaged(rows);
 
   const costBreakdown = useMemo(() => {
     const active = (contracts.data ?? []).filter((s) => s.isActive && s.flowType === "cost" && (s.amount ?? 0) > 0);
@@ -217,7 +219,7 @@ export default function Contracts() {
                 <table className="contracts-table">
                   <thead><tr><th>Vertrag</th><th>Art</th><th>Person</th><th className="num">Betrag</th><th>Turnus</th><th>Startdatum</th><th>Enddatum</th><th>Kündigen bis</th><th>Hinweis</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
-                    {rows.map(({ s, memberName }) => (
+                    {rowsPaged.pageItems.map(({ s, memberName }) => (
                       <tr key={s.id}>
                         <td><strong>{s.name}</strong></td>
                         <td><span className="badge">{flowTypeLabel(s.flowType)}</span></td>
@@ -247,7 +249,7 @@ export default function Contracts() {
               </div>
 
               <div className="rtable-cards">
-                {rows.map(({ s, memberName }) => (
+                {rowsPaged.pageItems.map(({ s, memberName }) => (
                   <div key={`m-${s.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{s.name}</strong>
@@ -273,6 +275,7 @@ export default function Contracts() {
                   </div>
                 ))}
               </div>
+              <Pager paged={rowsPaged} />
             </div>}
       </Section>
 

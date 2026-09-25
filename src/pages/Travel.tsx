@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { Booking, PackingItem, Trip } from "../api/types";
 import type { DialogField } from "../components/Dialog";
 import { useDialog } from "../components/Dialog";
-import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, Section, Stat, usePaged } from "../components/Ui";
 import TripsTimeline from "../components/TripsTimeline";
 import { dateTime, daysUntil, euro, shortDate, tripPhase } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -231,6 +231,21 @@ export default function Travel() {
     : (selectedTripId ? list.find((t) => t.id === selectedTripId) : undefined)
       ?? list.find(isCurrentOrUpcoming)
       ?? list[0];
+
+  // Packing items grouped by leg, computed null-safely so the hooks below can run before the
+  // early returns further down (trip may still be undefined here).
+  const outboundBookingIds = new Set((trip?.bookings ?? []).filter((b) => b.direction === "outbound").map((b) => b.id));
+  const returnBookingIds = new Set((trip?.bookings ?? []).filter((b) => b.direction === "return").map((b) => b.id));
+  const outboundPackingItems = (trip?.packingItems ?? []).filter((p) => p.bookingId != null && outboundBookingIds.has(p.bookingId));
+  const returnPackingItems = (trip?.packingItems ?? []).filter((p) => p.bookingId != null && returnBookingIds.has(p.bookingId));
+  // Falls back to "Allgemein" for an item whose booking lost its Hinreise/Rückreise tag later, so it
+  // never becomes invisible instead of just losing its grouping.
+  const generalPackingItems = (trip?.packingItems ?? []).filter((p) => !p.bookingId || (!outboundBookingIds.has(p.bookingId) && !returnBookingIds.has(p.bookingId)));
+
+  const bookingsPaged = usePaged(trip?.bookings ?? []);
+  const generalPackingPaged = usePaged(generalPackingItems);
+  const outboundPackingPaged = usePaged(outboundPackingItems);
+  const returnPackingPaged = usePaged(returnPackingItems);
 
   useEffect(() => {
     if (trip) setTripSearch(tripPickerLabel(trip));
@@ -585,13 +600,6 @@ export default function Travel() {
   const spend = trip.bookings.reduce((s, b) => s + (b.amount ?? 0), 0);
   const outboundBooking = trip.bookings.find((b) => b.direction === "outbound");
   const returnBooking = trip.bookings.find((b) => b.direction === "return");
-  const outboundBookingIds = new Set(trip.bookings.filter((b) => b.direction === "outbound").map((b) => b.id));
-  const returnBookingIds = new Set(trip.bookings.filter((b) => b.direction === "return").map((b) => b.id));
-  const outboundPackingItems = trip.packingItems.filter((p) => p.bookingId != null && outboundBookingIds.has(p.bookingId));
-  const returnPackingItems = trip.packingItems.filter((p) => p.bookingId != null && returnBookingIds.has(p.bookingId));
-  // Falls back to "Allgemein" for an item whose booking lost its Hinreise/Rückreise tag later, so it
-  // never becomes invisible instead of just losing its grouping.
-  const generalPackingItems = trip.packingItems.filter((p) => !p.bookingId || (!outboundBookingIds.has(p.bookingId) && !returnBookingIds.has(p.bookingId)));
 
   return (
     <>
@@ -668,7 +676,7 @@ export default function Travel() {
                   <table>
                     <thead><tr><th>Buchung</th><th className="num">Betrag</th><th className="num action-col">Aktion</th></tr></thead>
                     <tbody>
-                      {trip.bookings.map((b) => (
+                      {bookingsPaged.pageItems.map((b) => (
                         <tr key={b.id}>
                           <td>
                             <strong>{b.title}</strong>
@@ -698,7 +706,7 @@ export default function Travel() {
                 </div>
 
                 <div className="rtable-cards">
-                  {trip.bookings.map((b) => (
+                  {bookingsPaged.pageItems.map((b) => (
                     <div key={`m-${b.id}`} className="mobile-card">
                       <div className="mobile-card-head">
                         <strong>{b.title}</strong>
@@ -722,6 +730,7 @@ export default function Travel() {
                     </div>
                   ))}
                 </div>
+                <Pager paged={bookingsPaged} />
               </>}
           </div>
         </Section>
@@ -738,7 +747,10 @@ export default function Travel() {
             </div>
             {generalPackingItems.length === 0
               ? <p className="lede">Keine allgemeinen Einträge.</p>
-              : <PackingChecklist items={generalPackingItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />}
+              : <>
+                  <PackingChecklist items={generalPackingPaged.pageItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />
+                  <Pager paged={generalPackingPaged} />
+                </>}
           </div>
 
           {outboundBooking && (
@@ -753,7 +765,10 @@ export default function Travel() {
               </div>
               {outboundPackingItems.length === 0
                 ? <p className="lede">Noch nichts für die Hinreise gepackt.</p>
-                : <PackingChecklist items={outboundPackingItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />}
+                : <>
+                    <PackingChecklist items={outboundPackingPaged.pageItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />
+                    <Pager paged={outboundPackingPaged} />
+                  </>}
             </div>
           )}
 
@@ -769,7 +784,10 @@ export default function Travel() {
               </div>
               {returnPackingItems.length === 0
                 ? <p className="lede">Noch nichts für die Rückreise gepackt.</p>
-                : <PackingChecklist items={returnPackingItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />}
+                : <>
+                    <PackingChecklist items={returnPackingPaged.pageItems} onToggle={(p) => togglePacked(trip, p)} onEdit={(p) => editPacking(trip, p)} onRemove={(p) => removePacking(trip, p.id)} />
+                    <Pager paged={returnPackingPaged} />
+                  </>}
             </div>
           )}
         </Section>

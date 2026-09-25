@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { FamilyMember } from "../api/types";
 import { useDialog } from "../components/Dialog";
 import { AgeDistributionChart, FamilyTree, RELATION_TYPE_OPTIONS, ageFromBirthDate, describeRelation, pickRootId } from "../components/FamilyCharts";
-import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, Section, Stat, usePaged } from "../components/Ui";
 import { shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
@@ -407,6 +407,7 @@ export default function Family() {
 
   const membersById = new Map((members.data ?? []).map((m) => [m.id, m]));
   const rootId = pickRootId(members.data ?? []);
+  const membersPaged = usePaged(members.data ?? []);
 
   return (
     <>
@@ -414,7 +415,7 @@ export default function Family() {
         lede="Personen, Familienstruktur und Altersverteilung deiner Familie." />
       <ErrorBar message={error ?? members.error} />
 
-      <FamilyTree members={members.data ?? []} />
+      <FamilyTree members={members.data ?? []} onSelect={(m) => { setCopiedField(null); setDetailsMember(m); }} />
       <AgeDistributionChart members={members.data ?? []} />
 
       <div className="stats">
@@ -432,7 +433,7 @@ export default function Family() {
                 <table>
                   <thead><tr><th>Name</th><th>Beziehung</th><th>Geburtstag</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
-                    {(members.data ?? []).map((m) => (
+                    {membersPaged.pageItems.map((m) => (
                       <tr key={m.id}>
                         <td><strong>{m.fullName}</strong></td>
                         <td>{describeRelation(m, membersById, rootId)}</td>
@@ -478,7 +479,7 @@ export default function Family() {
               </div>
 
               <div className="rtable-cards">
-                {(members.data ?? []).map((m) => (
+                {membersPaged.pageItems.map((m) => (
                   <div key={`m-${m.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{m.fullName}</strong>
@@ -520,6 +521,7 @@ export default function Family() {
                   </div>
                 ))}
               </div>
+              <Pager paged={membersPaged} />
             </div>}
       </Section>
 

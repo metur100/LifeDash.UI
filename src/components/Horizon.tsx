@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import AlertDetailsDialog from "./AlertDetailsDialog";
 import type { Alert } from "../api/types";
 import { countdown, localDateIso, shortDate } from "../lib/format";
 
@@ -31,7 +31,7 @@ function dueIso(a: Alert): string | null {
 
 export default function Horizon({ alerts, horizon = 30 }:
   { alerts: Alert[]; horizon?: number }) {
-  const navigate = useNavigate();
+  const [selected, setSelected] = useState<Alert | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const todayDate = new Date();
@@ -67,7 +67,7 @@ export default function Horizon({ alerts, horizon = 30 }:
     return out;
   }, [todayIso, horizon]);
 
-  const open = (a: Alert) => { if (a.actionPath) navigate(a.actionPath); };
+  const open = (a: Alert) => setSelected(a);
 
   return (
     <div className="horizon">
@@ -132,6 +132,8 @@ export default function Horizon({ alerts, horizon = 30 }:
           );
         })}
       </div>
+
+      <AlertDetailsDialog alert={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

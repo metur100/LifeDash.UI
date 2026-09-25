@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import type { TaskItem } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { Empty, ErrorBar, PageHead } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, usePaged } from "../components/Ui";
 import TaskCompletionDonuts from "../components/TaskCompletionDonuts";
 import { countdown, daysUntil, shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
@@ -116,6 +116,7 @@ export default function Tasks() {
   const list = (tasks.data ?? [])
     .filter((t) => showDone || !t.isDone)
     .sort((a, b) => (a.dueOn ?? "9999").localeCompare(b.dueOn ?? "9999"));
+  const listPaged = usePaged(list);
 
   return (
     <>
@@ -138,8 +139,9 @@ export default function Tasks() {
       <div className="card">
         {list.length === 0
           ? <Empty title="Nichts offen." hint="Lege eine Aufgabe über das Plus an." />
-          : <ul className="checklist">
-              {list.map((t) => {
+          : <>
+            <ul className="checklist">
+              {listPaged.pageItems.map((t) => {
                 const d = daysUntil(t.dueOn);
                 return (
                   <li key={t.id} className={!t.isDone && d !== null && d < 0 ? "missing" : ""}>
@@ -163,8 +165,9 @@ export default function Tasks() {
                   </li>
                 );
               })}
-            </ul>}
-
+            </ul>
+            <Pager paged={listPaged} />
+          </>}
       </div>
     </>
   );

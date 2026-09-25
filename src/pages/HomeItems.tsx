@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import type { HomeItem } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, Section, usePaged } from "../components/Ui";
 import { countdown, daysUntil, euro, shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
@@ -146,6 +146,10 @@ export default function HomeItems() {
   const purchases = all.filter((i) => i.kind === "purchase");
   const warranties = all.filter((i) => i.kind === "warranty" || i.warrantyUntil);
   const doneItems = all.filter((i) => i.status === "done");
+  const repairsPaged = usePaged(repairs);
+  const warrantiesPaged = usePaged(warranties);
+  const purchasesPaged = usePaged(purchases);
+  const donePaged = usePaged(doneItems);
 
   return (
     <>
@@ -162,7 +166,7 @@ export default function HomeItems() {
                 <table>
                   <thead><tr><th>Aufgabe</th><th>Raum</th><th>Termin</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
-                    {repairs.map((r) => (
+                    {repairsPaged.pageItems.map((r) => (
                       <tr key={r.id}>
                         <td><strong>{r.title}</strong>{r.vendor && <div className="alert-msg">{r.vendor}</div>}</td>
                         <td>{r.room ?? "—"}</td>
@@ -190,7 +194,7 @@ export default function HomeItems() {
               </div>
 
               <div className="rtable-cards">
-                {repairs.map((r) => (
+                {repairsPaged.pageItems.map((r) => (
                   <div key={`m-${r.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{r.title}</strong>
@@ -215,6 +219,7 @@ export default function HomeItems() {
                   </div>
                 ))}
               </div>
+              <Pager paged={repairsPaged} />
             </>}
 
         </div>
@@ -230,7 +235,7 @@ export default function HomeItems() {
                   <table>
                     <thead><tr><th>Garantie</th><th className="num">Status</th><th className="num action-col">Aktion</th></tr></thead>
                     <tbody>
-                      {warranties.map((w) => {
+                      {warrantiesPaged.pageItems.map((w) => {
                         const d = daysUntil(w.warrantyUntil);
                         return (
                           <tr key={w.id}>
@@ -262,7 +267,7 @@ export default function HomeItems() {
                 </div>
 
                 <div className="rtable-cards">
-                  {warranties.map((w) => {
+                  {warrantiesPaged.pageItems.map((w) => {
                     const d = daysUntil(w.warrantyUntil);
                     return (
                       <div key={`m-${w.id}`} className="mobile-card">
@@ -289,6 +294,7 @@ export default function HomeItems() {
                     );
                   })}
                 </div>
+                <Pager paged={warrantiesPaged} />
               </>}
           </div>
         </Section>
@@ -302,7 +308,7 @@ export default function HomeItems() {
                   <table>
                     <thead><tr><th>Anschaffung</th><th className="num">Betrag</th><th className="num action-col">Aktion</th></tr></thead>
                     <tbody>
-                      {purchases.map((p) => (
+                      {purchasesPaged.pageItems.map((p) => (
                         <tr key={p.id}>
                           <td><strong>{p.title}</strong><div className="alert-msg">{shortDate(p.purchasedOn)}</div></td>
                           <td className="num">{p.cost ? euro(p.cost, p.currency) : "—"}</td>
@@ -325,7 +331,7 @@ export default function HomeItems() {
                 </div>
 
                 <div className="rtable-cards">
-                  {purchases.map((p) => (
+                  {purchasesPaged.pageItems.map((p) => (
                     <div key={`m-${p.id}`} className="mobile-card">
                       <div className="mobile-card-head">
                         <strong>{p.title}</strong>
@@ -345,6 +351,7 @@ export default function HomeItems() {
                     </div>
                   ))}
                 </div>
+                <Pager paged={purchasesPaged} />
               </>}
           </div>
         </Section>
@@ -359,7 +366,7 @@ export default function HomeItems() {
                 <table>
                   <thead><tr><th>Eintrag</th><th>Art</th><th>Status</th><th className="num action-col">Aktion</th></tr></thead>
                   <tbody>
-                    {doneItems.map((d) => (
+                    {donePaged.pageItems.map((d) => (
                       <tr key={d.id}>
                         <td><strong>{d.title}</strong><div className="alert-msg">{d.room ?? d.vendor ?? ""}</div></td>
                         <td>{kindLabel(d.kind)}</td>
@@ -383,7 +390,7 @@ export default function HomeItems() {
               </div>
 
               <div className="rtable-cards">
-                {doneItems.map((d) => (
+                {donePaged.pageItems.map((d) => (
                   <div key={`m-${d.id}`} className="mobile-card">
                     <div className="mobile-card-head">
                       <strong>{d.title}</strong>
@@ -403,6 +410,7 @@ export default function HomeItems() {
                   </div>
                 ))}
               </div>
+              <Pager paged={donePaged} />
             </>}
         </div>
       </Section>

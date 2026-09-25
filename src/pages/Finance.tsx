@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { FixedCost, Income, Payment } from "../api/types";
 import { useDialog } from "../components/Dialog";
 import { CostBreakdownDonut, CostHistoryChart, IncomeCostChart } from "../components/FinanceCharts";
-import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, Section, Stat, usePaged } from "../components/Ui";
 import { countdown, daysUntil, euro, localDateIso, shortDate, today } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
@@ -409,6 +409,11 @@ export default function Finance() {
   const paid = useMemo(() => (payments.data ?? [])
     .filter((p) => p.isPaid)
     .sort((a, b) => (b.paidOn ?? b.dueOn).localeCompare(a.paidOn ?? a.dueOn)), [payments.data]);
+
+  const upcomingPaged = usePaged(upcoming);
+  const costLinesPaged = usePaged(costLines);
+  const paidPaged = usePaged(paid);
+  const incomesPaged = usePaged(incomes.data ?? []);
 
   async function markPaid(p: Payment) {
     try {
@@ -981,7 +986,7 @@ export default function Finance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {upcoming.map((item) => {
+                  {upcomingPaged.pageItems.map((item) => {
                     const d = daysUntil(item.dueOn);
                     return (
                       <tr key={item.key}>
@@ -1049,7 +1054,7 @@ export default function Finance() {
             </div>
 
             <div className="rtable-cards">
-              {upcoming.map((item) => {
+              {upcomingPaged.pageItems.map((item) => {
                 const d = daysUntil(item.dueOn);
                 return (
                   <div key={item.key} className="mobile-card">
@@ -1110,6 +1115,7 @@ export default function Finance() {
                 );
               })}
             </div>
+            <Pager paged={upcomingPaged} />
             </>
           )}
         </div>
@@ -1138,7 +1144,7 @@ export default function Finance() {
                 </tr>
               </thead>
               <tbody>
-                {costLines.map((line) => {
+                {costLinesPaged.pageItems.map((line) => {
                   const fixedMeta = parseFixedCostMeta(costById.get(line.id)?.notes);
                   return (
                     <tr key={line.key}>
@@ -1188,7 +1194,7 @@ export default function Finance() {
           </div>
 
           <div className="rtable-cards">
-            {costLines.map((line) => {
+            {costLinesPaged.pageItems.map((line) => {
               const fixedMeta = parseFixedCostMeta(costById.get(line.id)?.notes);
               const paymentInfo = fixedMeta?.costType === "variable"
                 ? "Variable"
@@ -1233,6 +1239,7 @@ export default function Finance() {
               );
             })}
           </div>
+          <Pager paged={costLinesPaged} />
         </div>
       </Section>
 
@@ -1262,7 +1269,7 @@ export default function Finance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paid.map((p) => (
+                  {paidPaged.pageItems.map((p) => (
                     <tr key={p.id}>
                       <td><strong>{p.title}</strong></td>
                       <td>{shortDate(p.dueOn)}</td>
@@ -1291,7 +1298,7 @@ export default function Finance() {
             </div>
 
             <div className="rtable-cards">
-              {paid.map((p) => (
+              {paidPaged.pageItems.map((p) => (
                 <div key={p.id} className="mobile-card">
                   <div className="mobile-card-head">
                     <strong>{p.title}</strong>
@@ -1318,6 +1325,7 @@ export default function Finance() {
                 </div>
               ))}
             </div>
+            <Pager paged={paidPaged} />
             </>
           )}
         </div>
@@ -1346,7 +1354,7 @@ export default function Finance() {
                 </tr>
               </thead>
               <tbody>
-                {(incomes.data ?? []).map((i) => {
+                {incomesPaged.pageItems.map((i) => {
                   const nextIncome = nextIncomeDate(i);
                   return (
                   <tr key={i.id}>
@@ -1381,7 +1389,7 @@ export default function Finance() {
           </div>
 
           <div className="rtable-cards">
-            {(incomes.data ?? []).map((i) => {
+            {incomesPaged.pageItems.map((i) => {
               const nextIncome = nextIncomeDate(i);
               return (
                 <div key={i.id} className="mobile-card">
@@ -1412,6 +1420,7 @@ export default function Finance() {
               );
             })}
           </div>
+          <Pager paged={incomesPaged} />
         </div>
       </Section>
     </>

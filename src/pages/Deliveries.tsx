@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDialog } from "../components/Dialog";
 import { PackageStatusDonut, PackagesByCarrierChart } from "../components/DeliveryCharts";
-import { Empty, ErrorBar, PageHead, Section, Stat } from "../components/Ui";
+import { Empty, ErrorBar, Pager, PageHead, Section, Stat, usePaged } from "../components/Ui";
 import { daysUntil, dateTime, shortDate } from "../lib/format";
 import { api } from "../api/client";
 
@@ -282,6 +282,8 @@ export default function Deliveries() {
       return true;
     });
   }, [packages, carrierFilter, statusFilter]);
+
+  const packagesPaged = usePaged(filtered);
 
   async function handleQuickAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -713,7 +715,7 @@ export default function Deliveries() {
           />
         ) : (
           <div className="delivery-grid">
-            {filtered.map((pkg) => {
+            {packagesPaged.pageItems.map((pkg) => {
               const carrier = CARRIER_INFO[pkg.carrier] || CARRIER_INFO.other;
               const status = STATUS_LABELS[pkg.status] || STATUS_LABELS.in_transit;
               const dueDays = pkg.expectedDelivery ? daysUntil(pkg.expectedDelivery) : null;
@@ -831,6 +833,7 @@ export default function Deliveries() {
             })}
           </div>
         )}
+        <Pager paged={packagesPaged} />
       </Section>
     </>
   );

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import type { AuthorityCase } from "../api/types";
 import { useDialog } from "../components/Dialog";
-import { Empty, ErrorBar, PageHead } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, usePaged } from "../components/Ui";
 import { countdown, daysUntil, shortDate } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
@@ -172,6 +172,7 @@ export default function Authorities() {
     .filter((c) => statusFilter === "all"
       || (statusFilter === "open" && !isClosedStatus(c.status))
       || (statusFilter === "closed" && isClosedStatus(c.status)));
+  const listPaged = usePaged(list);
   return (
     <>
       <PageHead eyebrow="Behörden" title="Anträge und Fristen"
@@ -197,8 +198,9 @@ export default function Authorities() {
 
       {list.length === 0
         ? <Empty title="Kein Vorgang in dieser Auswahl." hint="Lege einen Antrag an, oder ändere die Filter oben." />
-        : <div className="grid-2">
-            {list.map((c) => {
+        : <>
+          <div className="grid-2">
+            {listPaged.pageItems.map((c) => {
               const days = daysUntil(c.deadlineOn);
               return (
                 <article className="card" key={c.id}>
@@ -254,7 +256,9 @@ export default function Authorities() {
                 </article>
               );
             })}
-          </div>}
+          </div>
+          <Pager paged={listPaged} />
+        </>}
     </>
   );
 }

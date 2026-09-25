@@ -7,7 +7,7 @@ import { AlertCompositionChart, UpcomingLoadChart } from "../components/Dashboar
 import DashboardDeliveries from "../components/DashboardDeliveries";
 import DashboardWeather from "../components/DashboardWeather";
 import Horizon from "../components/Horizon";
-import { Empty, ErrorBar, PageHead, Stat } from "../components/Ui";
+import { Empty, ErrorBar, PageHead, Pager, Stat, usePaged } from "../components/Ui";
 import { euro } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 
@@ -40,6 +40,7 @@ export default function Dashboard({ onCount }: { onCount?: (n: number) => void }
       return data.alerts.filter((a) => String(a.severity) === filter);
     return data.alerts.filter((a) => a.module === filter);
   }, [data, filter]);
+  const shownPaged = usePaged(shown);
 
   if (loading) return <p className="lede">Wird geladen …</p>;
   if (error) return <ErrorBar message={error} />;
@@ -107,7 +108,10 @@ export default function Dashboard({ onCount }: { onCount?: (n: number) => void }
       {shown.length === 0
         ? <Empty title="Hier ist gerade nichts fällig."
                  hint="Sobald ein Dokument abläuft oder eine Frist näher rückt, taucht es hier auf." />
-        : <div className="alert-list">{shown.map((a) => <AlertRow key={a.id} alert={a} />)}</div>}
+        : <>
+            <div className="alert-list">{shownPaged.pageItems.map((a) => <AlertRow key={a.id} alert={a} />)}</div>
+            <Pager paged={shownPaged} />
+          </>}
     </>
   );
 }

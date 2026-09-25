@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import DOMPurify from "dompurify";
 import { useDialog } from "../components/Dialog";
-import { Empty, ErrorBar, PageHead, Section } from "../components/Ui";
+import { Empty, ErrorBar, Pager, PageHead, Section, usePaged } from "../components/Ui";
 
 type GoogleTokenResponse = {
   access_token?: string;
@@ -416,6 +416,7 @@ export default function Mail() {
     }
   }
 
+  const messagesPaged = usePaged(messages);
   const connected = !!token.current && tokenExpiresAt.current > Date.now();
   const selectedActions = selected && <div className="row gap">
     <button className="btn ghost small icon-only" aria-label="Antworten" title="Antworten" onClick={() => openComposer("reply")} disabled={busy}><i className="fa-solid fa-reply" aria-hidden /></button>
@@ -479,7 +480,7 @@ export default function Mail() {
             <Empty title="Keine Nachrichten gefunden" hint="Passe die Suche an oder aktualisiere den Posteingang." />
           ) : (
             <div className="mail-list">
-              {messages.map((message) => {
+              {messagesPaged.pageItems.map((message) => {
                 const unread = message.labelIds?.includes("UNREAD");
                 return <div key={message.id} className="mail-row-wrap">
                   <button className={`mail-row ${unread ? "unread" : ""} ${selected?.id === message.id ? "selected" : ""}`} type="button" onClick={() => void openMessage(message.id)}>
@@ -490,6 +491,7 @@ export default function Mail() {
                   {selected?.id === message.id && <div className="mail-inline-detail"><MailMessageContent message={selected} onAttachment={openAttachment} busy={busy} actions={selectedActions} /></div>}
                 </div>;
               })}
+              <Pager paged={messagesPaged} />
             </div>
           )}
         </Section>
