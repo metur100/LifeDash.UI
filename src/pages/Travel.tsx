@@ -189,10 +189,21 @@ function DestinationMap({ startPlace, destination, apiKey }: { startPlace?: stri
     return () => { cancelled = true; };
   }, [apiKey, destination, startPlace]);
 
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(startPlace ?? "")}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+
   return (
     <Section title="Karte und Orte">
       {error ? <ErrorBar message={error} /> : <div ref={mapElement} className="destination-map" aria-label={`Karte von ${destination}`} />}
-      {route && <div className="route-summary"><i className="fa-solid fa-route" aria-hidden /><strong>{startPlace} nach {destination}</strong><span>{route.distance} · ca. {route.duration} mit dem Auto</span></div>}
+      {route && (
+        <div className="route-summary">
+          <i className="fa-solid fa-route" aria-hidden />
+          <strong>{startPlace} nach {destination}</strong>
+          <span>{route.distance} · ca. {route.duration} mit dem Auto</span>
+          <a className="btn route-go" href={directionsUrl} target="_blank" rel="noreferrer">
+            <i className="fa-solid fa-diamond-turn-right" aria-hidden /> Route starten
+          </a>
+        </div>
+      )}
       {nearby.length > 0 && (
         <div className="card-list nearby-places">
           {nearby.map((place, index) => (
@@ -203,9 +214,11 @@ function DestinationMap({ startPlace, destination, apiKey }: { startPlace?: stri
           ))}
         </div>
       )}
-      <a className="btn ghost small" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`} target="_blank" rel="noreferrer">
-        In Google Maps öffnen <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden />
-      </a>
+      {!route && (
+        <a className="btn ghost small" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`} target="_blank" rel="noreferrer">
+          In Google Maps öffnen <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden />
+        </a>
+      )}
     </Section>
   );
 }
