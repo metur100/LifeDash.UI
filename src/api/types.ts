@@ -150,6 +150,14 @@ export interface Trip {
   bookings: Booking[]; packingItems: PackingItem[];
 }
 
+export type SavingsKind = "deposit" | "withdrawal";
+
+/** One cash-savings movement. amount is always positive; kind decides the sign. */
+export interface SavingsEntry {
+  id: number; userId: number; kind: SavingsKind; amount: number;
+  currency: string; entryDate: string; note?: string | null;
+}
+
 export interface TaskItem {
   id: number; userId: number; title: string; module: string;
   dueOn?: string | null; priority: string; isDone: boolean;

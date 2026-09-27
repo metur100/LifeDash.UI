@@ -15,6 +15,7 @@ import Tasks from "./pages/Tasks";
 import Termine from "./pages/Termine";
 import Travel from "./pages/Travel";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Savings from "./pages/Savings";
 import TermsOfService from "./pages/TermsOfService";
 import WishList from "./pages/WishList";
 
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="authorities" element={<Authorities />} />
           <Route path="authorities/:id" element={<Authorities />} />
           <Route path="finance" element={<Finance />} />
+          <Route path="savings" element={<Savings />} />
           <Route path="contracts" element={<Contracts />} />
           <Route path="deliveries" element={<Deliveries />} />
           <Route path="wishlist" element={<WishList />} />

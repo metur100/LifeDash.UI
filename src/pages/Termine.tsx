@@ -5,6 +5,7 @@ import { useDialog } from "../components/Dialog";
 import { AppointmentCategoryDonut, AppointmentLoadChart } from "../components/FamilyCharts";
 import { Empty, ErrorBar, PageHead, Pager, Section, usePaged } from "../components/Ui";
 import { countdown, dateTime, daysUntil, shortDate, today } from "../lib/format";
+import { directionsUrl } from "../lib/maps";
 import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
 import { APPOINTMENT_CATEGORIES, IMPORTANT_DATE_CATEGORIES } from "../lib/categories";
@@ -891,6 +892,13 @@ export default function Termine() {
                         <i className="fa-solid fa-check" aria-hidden />
                         <span className="sr-only">Erledigt</span>
                       </button>
+                      {a.location?.trim() && (
+                        <a className="btn ghost small icon-only" href={directionsUrl(a.location.trim())} target="_blank" rel="noreferrer"
+                          aria-label={`Route zu ${a.location.trim()} starten`} title="Route starten">
+                          <i className="fa-solid fa-diamond-turn-right" aria-hidden />
+                          <span className="sr-only">Route starten</span>
+                        </a>
+                      )}
                       <button className="btn ghost small icon-only" aria-label="Termin bearbeiten" title="Termin bearbeiten" onClick={() => editAppointment(a)}>
                         <i className="fa-solid fa-pen-to-square" aria-hidden />
                         <span className="sr-only">Bearbeiten</span>
