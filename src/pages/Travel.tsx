@@ -7,6 +7,7 @@ import { useDialog } from "../components/Dialog";
 import { Empty, ErrorBar, PageHead, Pager, Section, Stat, usePaged } from "../components/Ui";
 import TripsTimeline from "../components/TripsTimeline";
 import { dateTime, daysUntil, euro, shortDate, tripPhase } from "../lib/format";
+import { directionsUrl } from "../lib/maps";
 import { useAsync } from "../lib/useAsync";
 import { useCustomOptions } from "../lib/useCustomOptions";
 
@@ -189,8 +190,6 @@ function DestinationMap({ startPlace, destination, apiKey }: { startPlace?: stri
     return () => { cancelled = true; };
   }, [apiKey, destination, startPlace]);
 
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(startPlace ?? "")}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
-
   return (
     <Section title="Karte und Orte">
       {error ? <ErrorBar message={error} /> : <div ref={mapElement} className="destination-map" aria-label={`Karte von ${destination}`} />}
@@ -199,7 +198,7 @@ function DestinationMap({ startPlace, destination, apiKey }: { startPlace?: stri
           <i className="fa-solid fa-route" aria-hidden />
           <strong>{startPlace} nach {destination}</strong>
           <span>{route.distance} · ca. {route.duration} mit dem Auto</span>
-          <a className="btn route-go" href={directionsUrl} target="_blank" rel="noreferrer">
+          <a className="btn route-go" href={directionsUrl(destination)} target="_blank" rel="noreferrer">
             <i className="fa-solid fa-diamond-turn-right" aria-hidden /> Route starten
           </a>
         </div>
@@ -215,9 +214,14 @@ function DestinationMap({ startPlace, destination, apiKey }: { startPlace?: stri
         </div>
       )}
       {!route && (
-        <a className="btn ghost small" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`} target="_blank" rel="noreferrer">
-          In Google Maps öffnen <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden />
-        </a>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <a className="btn small" href={directionsUrl(destination)} target="_blank" rel="noreferrer">
+            <i className="fa-solid fa-diamond-turn-right" aria-hidden /> Route starten
+          </a>
+          <a className="btn ghost small" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`} target="_blank" rel="noreferrer">
+            In Google Maps öffnen <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden />
+          </a>
+        </div>
       )}
     </Section>
   );

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import type { Alert, Appointment, FamilyMember, ImportantDate } from "../api/types";
+import type { Alert, Appointment, FamilyMember, ImportantDate, Trip } from "../api/types";
 import { APPOINTMENT_CATEGORIES, IMPORTANT_DATE_CATEGORIES } from "../lib/categories";
 import type { Option } from "../lib/categories";
 import { countdown, dateTime, severityLabel, shortDate } from "../lib/format";
+import { directionsUrl } from "../lib/maps";
 import { recurrenceLabel } from "../lib/recurrence";
 import { useCustomOptions } from "../lib/useCustomOptions";
 
@@ -33,6 +34,7 @@ function readableNotes(notes?: string | null): string {
 type Details =
   | { kind: "appointment"; appt: Appointment; members: FamilyMember[] }
   | { kind: "date"; date: ImportantDate; members: FamilyMember[] }
+  | { kind: "trip"; trip: Trip }
   | null;
 
 /**
@@ -68,10 +70,14 @@ export default function AlertDetailsDialog({ alert, onClose }: { alert: Alert | 
         ]);
         const date = dates.find((d) => d.id === id);
         if (!cancelled && date) setDetails({ kind: "date", date, members });
+      } else if (alert!.relatedType === "Trip") {
+        const trips = await api.get<Trip[]>("/api/trips");
+        const trip = trips.find((t) => t.id === id);
+        if (!cancelled && trip) setDetails({ kind: "trip", trip });
       }
     }
 
-    if (alert.relatedType === "Appointment" || alert.relatedType === "ImportantDate") {
+    if (alert.relatedType === "Appointment" || alert.relatedType === "ImportantDate" || alert.relatedType === "Trip") {
       setLoading(true);
       load().catch(() => { /* fall back to the alert's own fields */ })
         .finally(() => { if (!cancelled) setLoading(false); });
@@ -121,7 +127,15 @@ export default function AlertDetailsDialog({ alert, onClose }: { alert: Alert | 
       ["Erinnerung", "Am Tag selbst (E-Mail)"],
     );
     notes = readableNotes(d.notes);
+  } else if (details?.kind === "trip") {
+    const t = details.trip;
+    rows.push(
+      ["Ziel", t.destination],
+      ["Zeitraum", t.endsOn ? `${shortDate(t.startsOn)} – ${shortDate(t.endsOn)}` : shortDate(t.startsOn)],
+    );
+    notes = readableNotes(t.notes);
   }
+  const destination = details?.kind === "trip" ? details.trip.destination?.trim() : null;
 
   const shown = rows.filter(([, v]) => v != null && String(v).trim() !== "");
 
@@ -154,6 +168,11 @@ export default function AlertDetailsDialog({ alert, onClose }: { alert: Alert | 
 
         <div className="dlg-actions">
           <button type="button" className="btn ghost" onClick={onClose}>Schließen</button>
+          {destination && (
+            <a className="btn" href={directionsUrl(destination)} target="_blank" rel="noreferrer">
+              <i className="fa-solid fa-diamond-turn-right" aria-hidden /> Route starten
+            </a>
+          )}
           {alert.actionPath && (
             <button type="button" className="btn" onClick={() => { onClose(); navigate(alert.actionPath!); }}>
               {alert.actionLabel ?? "Öffnen"}
