@@ -14,34 +14,53 @@ const kindLabels: Record<SavingsKind, string> = { deposit: "Einzahlung", withdra
 
 const signed = (e: SavingsEntry) => (e.kind === "withdrawal" ? -e.amount : e.amount);
 
+const CURRENCIES = ["EUR", "BAM"] as const;
+type Currency = (typeof CURRENCIES)[number];
+const currencyLabels: Record<Currency, string> = { EUR: "Euro (€)", BAM: "Konvertible Mark (KM)" };
+const currencyField = {
+  key: "currency", label: "Währung", type: "select" as const,
+  options: CURRENCIES.map((c) => ({ value: c, label: currencyLabels[c] })),
+};
+// The KM is pegged to the euro at a fixed rate, so a combined total needs no live exchange rate.
+const KM_PER_EUR = 1.95583;
+
 export default function Savings() {
   const entries = useAsync<SavingsEntry[]>(() => api.get("/api/savings-entries"), []);
   const dialog = useDialog();
   const [error, setError] = useState<string | null>(null);
 
-  // Oldest first to compute the running balance, then flipped so the newest movement is on top.
+  // Oldest first to compute each currency's running balance, then flipped so the newest is on top.
   const history = useMemo(() => {
     const sorted = [...(entries.data ?? [])].sort((a, b) =>
       a.entryDate.localeCompare(b.entryDate) || a.id - b.id);
-    let running = 0;
-    return sorted.map((e) => ({ entry: e, balanceAfter: (running += signed(e)) })).reverse();
+    const running: Record<string, number> = {};
+    return sorted
+      .map((e) => ({ entry: e, balanceAfter: (running[e.currency] = (running[e.currency] ?? 0) + signed(e)) }))
+      .reverse();
   }, [entries.data]);
 
-  const deposited = (entries.data ?? []).filter((e) => e.kind === "deposit").reduce((s, e) => s + e.amount, 0);
-  const withdrawn = (entries.data ?? []).filter((e) => e.kind === "withdrawal").reduce((s, e) => s + e.amount, 0);
-  const balance = deposited - withdrawn;
+  const totals = useMemo(() => Object.fromEntries(CURRENCIES.map((c) => {
+    const own = (entries.data ?? []).filter((e) => e.currency === c);
+    const deposited = own.filter((e) => e.kind === "deposit").reduce((s, e) => s + e.amount, 0);
+    const withdrawn = own.filter((e) => e.kind === "withdrawal").reduce((s, e) => s + e.amount, 0);
+    return [c, { deposited, withdrawn, balance: deposited - withdrawn }];
+  })) as Record<Currency, { deposited: number; withdrawn: number; balance: number }>, [entries.data]);
+  const combinedEur = totals.EUR.balance + totals.BAM.balance / KM_PER_EUR;
   const historyPaged = usePaged(history);
+  // New entries default to the currency used last, since movements usually come in runs.
+  const lastCurrency = history[0]?.entry.currency ?? "EUR";
 
   async function addEntry(kind: SavingsKind) {
     const values = await dialog.form({
       title: kind === "deposit" ? "Geld einzahlen" : "Geld entnehmen",
       submitText: kind === "deposit" ? "Einzahlen" : "Entnehmen",
       fields: [
-        { key: "amount", label: "Betrag (€)", type: "number" },
+        currencyField,
+        { key: "amount", label: "Betrag", type: "number" },
         { key: "entryDate", label: "Datum", type: "date" },
         { key: "note", label: kind === "deposit" ? "Notiz" : "Wofür?" },
       ],
-      initial: { amount: "", entryDate: today(), note: "" },
+      initial: { currency: lastCurrency, amount: "", entryDate: today(), note: "" },
     });
     if (!values) return;
 
@@ -52,7 +71,7 @@ export default function Savings() {
       await api.post("/api/savings-entries", {
         kind,
         amount,
-        currency: "EUR",
+        currency: String(values.currency),
         entryDate: String(values.entryDate).trim() || today(),
         note: String(values.note).trim() || null,
       });
@@ -73,11 +92,12 @@ export default function Savings() {
           type: "select",
           options: (Object.keys(kindLabels) as SavingsKind[]).map((k) => ({ value: k, label: kindLabels[k] })),
         },
-        { key: "amount", label: "Betrag (€)", type: "number" },
+        currencyField,
+        { key: "amount", label: "Betrag", type: "number" },
         { key: "entryDate", label: "Datum", type: "date" },
         { key: "note", label: "Notiz" },
       ],
-      initial: { kind: e.kind, amount: e.amount.toString(), entryDate: e.entryDate, note: e.note ?? "" },
+      initial: { kind: e.kind, currency: e.currency, amount: e.amount.toString(), entryDate: e.entryDate, note: e.note ?? "" },
     });
     if (!values) return;
 
@@ -88,6 +108,7 @@ export default function Savings() {
       await api.put(`/api/savings-entries/${e.id}`, {
         ...e,
         kind: String(values.kind),
+        currency: String(values.currency),
         amount,
         entryDate: String(values.entryDate).trim() || e.entryDate,
         note: String(values.note).trim() || null,
@@ -154,10 +175,13 @@ export default function Savings() {
       <ErrorBar message={error ?? entries.error} />
 
       <div className="stats">
-        <Stat label="Aktueller Stand" value={euro(balance)} tone={balance < 0 ? "neg" : "pos"}
-          note={history[0] ? `zuletzt geändert ${shortDate(history[0].entry.entryDate)}` : "noch keine Bewegungen"} />
-        <Stat label="Eingezahlt" value={euro(deposited)} />
-        <Stat label="Entnommen" value={euro(withdrawn)} />
+        {CURRENCIES.map((c) => (
+          <Stat key={c} label={`Stand ${c === "BAM" ? "KM" : "Euro"}`} value={euro(totals[c].balance, c)}
+            tone={totals[c].balance < 0 ? "neg" : "pos"}
+            note={`+${euro(totals[c].deposited, c)} ein · −${euro(totals[c].withdrawn, c)} raus`} />
+        ))}
+        <Stat label="Gesamt in Euro" value={euro(combinedEur)}
+          note={history[0] ? `KM zum festen Kurs 1,95583 · zuletzt ${shortDate(history[0].entry.entryDate)}` : "noch keine Bewegungen"} />
       </div>
 
       <Section title="Verlauf">

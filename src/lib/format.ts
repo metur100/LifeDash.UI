@@ -1,5 +1,8 @@
+// Intl prints the Bosnian Konvertible Mark as "BAM"; locally it's written "KM".
 export const euro = (n: number, currency = "EUR") =>
-  new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(n);
+  currency === "BAM"
+    ? `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} KM`
+    : new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(n);
 
 export const shortDate = (iso?: string | null) =>
   iso ? new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })
