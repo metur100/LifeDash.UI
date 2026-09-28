@@ -135,7 +135,9 @@ export default function AlertDetailsDialog({ alert, onClose }: { alert: Alert | 
     );
     notes = readableNotes(t.notes);
   }
-  const destination = details?.kind === "trip" ? details.trip.destination?.trim() : null;
+  const destination = details?.kind === "trip" ? details.trip.destination?.trim()
+    : details?.kind === "appointment" ? details.appt.location?.trim()
+    : null;
 
   const shown = rows.filter(([, v]) => v != null && String(v).trim() !== "");
 
