@@ -247,14 +247,21 @@ export default function Termine() {
     setMailScanMessage(null);
     setMailScanBusy(true);
     try {
-      const res = await api.post<{ success: boolean; scanned: number; added: number; skippedDuplicate: number }>(
-        "/api/appointments/scan-mailbox"
-      );
+      const res = await api.post<{
+        success: boolean;
+        scanned: number;
+        added: number;
+        skippedDuplicate: number;
+        removedCancelled: number;
+      }>("/api/appointments/scan-mailbox");
       await appts.reload();
+      const parts: string[] = [];
+      if (res.added > 0) parts.push(`${res.added} neue(r) Termin(e) hinzugefügt`);
+      if (res.removedCancelled > 0) parts.push(`${res.removedCancelled} abgesagte(r) Termin(e) entfernt`);
       setMailScanMessage(
-        res.added === 0
+        parts.length === 0
           ? "Postfach durchsucht — keine neuen Termine gefunden."
-          : `Postfach durchsucht: ${res.added} neue(r) Termin(e) hinzugefügt.`
+          : `Postfach durchsucht: ${parts.join(", ")}.`
       );
     } catch (e) {
       setError((e as Error).message);
